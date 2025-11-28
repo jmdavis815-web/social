@@ -293,6 +293,113 @@ function renderPopularTopics() {
 }
 
 // ===========================
+//  USER LIKE STATS & PEOPLE TO FOLLOW
+// ===========================
+function computeUserLikeStats() {
+  const posts = loadPosts();
+  const users = loadUsers();
+  const stats = {};
+
+  // Sum likes per userId
+  posts.forEach((post) => {
+    const userId = post.userId;
+    if (!userId) return;
+    const likes = typeof post.likes === "number" ? post.likes : 0;
+
+    if (!stats[userId]) {
+      stats[userId] = {
+        userId,
+        totalLikes: 0,
+        postCount: 0,
+      };
+    }
+    stats[userId].postCount += 1;
+    stats[userId].totalLikes += likes;
+  });
+
+  // Map to include user details
+  const result = Object.values(stats)
+    .map((entry) => {
+      const user = users.find((u) => u.id === entry.userId) || {};
+      return {
+        ...entry,
+        name: user.name || "Unknown",
+        username: user.username || "user",
+      };
+    })
+    .sort((a, b) => {
+      // Sort by likes desc, then postCount desc
+      if (b.totalLikes !== a.totalLikes) {
+        return b.totalLikes - a.totalLikes;
+      }
+      return b.postCount - a.postCount;
+    });
+
+  return result;
+}
+
+function renderPeopleToFollow() {
+  const container = document.getElementById("peopleToFollow");
+  if (!container) return;
+
+  const currentUser = getCurrentUser();
+  const stats = computeUserLikeStats();
+
+  container.innerHTML = "";
+
+  // Filter out current user if logged in
+  const filtered = currentUser
+    ? stats.filter((s) => s.userId !== currentUser.id)
+    : stats;
+
+  if (!filtered.length) {
+    const empty = document.createElement("small");
+    empty.className = "text-body-secondary";
+    empty.textContent =
+      "Once people start posting and receiving likes, suggested accounts will appear here.";
+    container.appendChild(empty);
+    return;
+  }
+
+  // Show top 3
+  const topUsers = filtered.slice(0, 3);
+
+  topUsers.forEach((u) => {
+    const row = document.createElement("div");
+    row.className =
+      "d-flex align-items-center justify-content-between mb-2";
+
+    const initials =
+      (u.name || "")
+        .split(" ")
+        .filter(Boolean)
+        .map((n) => n[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase() || "U";
+
+    row.innerHTML = `
+      <div class="d-flex align-items-center">
+        <div class="mini-avatar">${escapeHtml(initials)}</div>
+        <div>
+          <div class="fw-semibold" style="font-size: 0.86rem;">
+            ${escapeHtml(u.name)}
+          </div>
+          <div class="text-body-secondary" style="font-size: 0.78rem;">
+            @${escapeHtml(u.username)} · ${u.totalLikes}♥
+          </div>
+        </div>
+      </div>
+      <button class="btn btn-outline-soft btn-sm px-2 py-1" disabled>
+        Follow
+      </button>
+    `;
+
+    container.appendChild(row);
+  });
+}
+
+// ===========================
 //  ACTIVE FILTER BAR
 // ===========================
 function renderActiveTopicBar() {
@@ -358,6 +465,9 @@ function renderCommentsForPost(postId, commentsSection) {
 // ===========================
 //  RENDER POSTS
 // ===========================
+// ===========================
+//  RENDER POSTS
+// ===========================
 function renderPosts() {
   const container = document.getElementById("postList");
   if (!container) return;
@@ -405,63 +515,55 @@ function renderPosts() {
 
     article.innerHTML = `
       <div class="d-flex gap-2">
-        <div class="post-avatar">${escapeHtml(initials)}</div>
+
+        <!-- CLICKABLE AVATAR -->
+        <a href="profile.html?userId=${post.userId}" class="post-avatar-link" style="text-decoration:none;">
+          <div class="post-avatar">${escapeHtml(initials)}</div>
+        </a>
+
         <div class="flex-grow-1">
           <div class="d-flex justify-content-between">
+
+            <!-- CLICKABLE NAME — HANDLE REMOVED -->
             <div>
-              <span class="post-username">${escapeHtml(
-                post.name || "Unknown"
-              )}</span>
-              <span class="post-handle ms-1">@${escapeHtml(
-                post.username || "user"
-              )}</span>
+              <a href="profile.html?userId=${post.userId}" class="post-username-link">
+                <span class="post-username">${escapeHtml(post.name || "Unknown")}</span>
+              </a>
             </div>
-            <span class="post-meta">${when} · ${escapeHtml(
-              visibility
-            )}</span>
+
+            <span class="post-meta">${when} · ${escapeHtml(visibility)}</span>
           </div>
+
           <div class="post-body">
             ${escapeHtml(post.body || "")}
           </div>
+
           <div class="post-actions">
-            <button
-              type="button"
-              class="like-btn"
-              data-liked="false"
-              data-count="${likes}"
-            >
+            <button type="button" class="like-btn" data-liked="false" data-count="${likes}">
               <span class="heart-icon">♡</span>
               <span class="like-count">${likes}</span>
             </button>
-            <button
-              type="button"
-              class="comment-btn"
-              data-post-id="${post.id}"
-            >
+
+            <button type="button" class="comment-btn" data-post-id="${post.id}">
               <i>💬</i>
               <span class="comment-count">${commentCount}</span>
             </button>
+
             <button type="button">
               <i>↻</i> Share
             </button>
           </div>
 
-          <div
-            class="post-comments mt-2"
-            data-comments-for="${post.id}"
-            hidden
-          >
+          <div class="post-comments mt-2" data-comments-for="${post.id}" hidden>
             <div class="comment-list mb-2"></div>
+
             <form class="comment-form d-flex gap-2">
               <input
                 type="text"
                 class="form-control form-control-sm comment-input"
                 placeholder="Write a comment…"
               />
-              <button
-                type="submit"
-                class="btn btn-outline-soft btn-sm"
-              >
+              <button type="submit" class="btn btn-outline-soft btn-sm">
                 Comment
               </button>
             </form>
@@ -477,7 +579,11 @@ function renderPosts() {
 // ===========================
 //  INIT POSTS
 // ===========================
+// ===========================
+//  INIT POSTS
+// ===========================
 function initPosts() {
+  // Seed demo posts if none exist
   let posts = loadPosts();
   if (!posts.length) {
     const now = Date.now();
@@ -491,7 +597,7 @@ function initPosts() {
           "First test of the new OpenWall feed ✅  Soon this page will show real posts from real accounts, always sorted with the latest at the top. #projects",
         createdAt: now - 2 * 60 * 1000,
         visibility: "Public",
-        likes: 12,
+        likes: 1,
         tags: ["projects"],
       },
       {
@@ -503,7 +609,7 @@ function initPosts() {
           "Imagine using this feed like a micro-blog: quick updates, photos, or longer reflections. You can follow people you care about and keep everything in one simple stream. #dailyupdate",
         createdAt: now - 10 * 60 * 1000,
         visibility: "Public",
-        likes: 7,
+        likes: 0,
         tags: ["dailyupdate"],
       },
       {
@@ -515,15 +621,46 @@ function initPosts() {
           "Next steps: accounts, likes, comments, and the ability to filter your wall by people and tags. For now this layout shows how everything will look when wired to your backend. #randomthoughts",
         createdAt: now - 32 * 60 * 1000,
         visibility: "Friends",
-        likes: 19,
+        likes: 0,
         tags: ["randomthoughts"],
       },
     ];
     savePosts(posts);
   }
+
+  // ✅ Seed demo users to match those posts, if no users yet
+  let users = loadUsers();
+  if (!users.length) {
+    users = [
+      {
+        id: 1,
+        name: "Michael",
+        username: "michael",
+        email: "michael@example.com",
+        password: "demo",
+      },
+      {
+        id: 2,
+        name: "Alex Smith",
+        username: "alex",
+        email: "alex@example.com",
+        password: "demo",
+      },
+      {
+        id: 3,
+        name: "Jordan",
+        username: "jordan",
+        email: "jordan@example.com",
+        password: "demo",
+      },
+    ];
+    saveUsers(users);
+  }
+
   renderPosts();
   renderPopularTopics();
   renderActiveTopicBar();
+  renderPeopleToFollow(); // make People to follow work from the start
 }
 
 // ===========================
@@ -554,12 +691,14 @@ function updateAuthUI() {
       : document.querySelector(".navbar .d-flex.align-items-center.gap-2");
 
     if (navActionContainer) {
+      // create badge as a LINK to the profile
       if (!userBadge) {
-        userBadge = document.createElement("span");
+        userBadge = document.createElement("a");
         userBadge.id = "navUserBadge";
         userBadge.className = "badge rounded-pill px-3 py-2 me-1";
         userBadge.style.backgroundColor = "var(--accent-soft)";
         userBadge.style.color = "var(--accent)";
+        userBadge.style.textDecoration = "none";
         navActionContainer.prepend(userBadge);
       }
 
@@ -580,6 +719,8 @@ function updateAuthUI() {
 
     if (userBadge) {
       userBadge.textContent = `@${user.username}`;
+      userBadge.href = `profile.html?userId=${encodeURIComponent(user.id)}`;
+      userBadge.style.cursor = "pointer";
     }
 
     if (composerInput) {
@@ -587,8 +728,7 @@ function updateAuthUI() {
       composerInput.placeholder = `Share what's on your mind, ${user.name}…`;
     }
     if (composerNote) {
-      composerNote.textContent =
-        "Your posts will appear at the top of the wall.";
+      composerNote.textContent = "Your posts will appear at the top of the wall.";
     }
     if (composerButton) {
       composerButton.disabled = false;
@@ -610,8 +750,7 @@ function updateAuthUI() {
       composerInput.placeholder = "Share what's on your mind, Michael…";
     }
     if (composerNote) {
-      composerNote.textContent =
-        "Log in or create an account to start posting.";
+      composerNote.textContent = "Log in or create an account to start posting.";
     }
     if (composerButton) {
       composerButton.disabled = false;
@@ -666,6 +805,7 @@ if (composerButtonEl && composerInputEl) {
     renderPosts();
     renderPopularTopics();
     renderActiveTopicBar();
+    renderPeopleToFollow(); // new post can affect suggestions
   });
 
   composerInputEl.addEventListener("keydown", (e) => {
@@ -812,7 +952,8 @@ document.addEventListener("click", function (e) {
     if (index !== -1) {
       posts[index].likes = count;
       savePosts(posts);
-      renderPopularTopics(); // likes change topic ranking
+      renderPopularTopics();   // likes affect topic rankings
+      renderPeopleToFollow();  // likes affect people suggestions
     }
   }
 });
