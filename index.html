@@ -39,13 +39,24 @@
         </ul>
 
         <div class="d-flex align-items-center gap-2">
+          <!-- THEME TOGGLE BUTTON -->
+          <button
+            id="themeToggle"
+            class="btn btn-outline-soft btn-sm theme-toggle-btn"
+            type="button"
+            aria-label="Switch to dark mode"
+          >
+              🌓
+          </button>
+
+          <!-- LOGIN / SIGNUP BUTTONS -->
           <button
             id="loginNavBtn"
-            class="btn btn-outline-soft btn-sm theme-toggle-btn"
+            class="btn btn-outline-soft btn-sm"
             type="button"
             data-bs-toggle="modal"
             data-bs-target="#loginModal"
-            >
+          >
             Log in
           </button>
           <button
@@ -53,7 +64,7 @@
             class="btn btn-main btn-sm"
             data-bs-toggle="modal"
             data-bs-target="#signupModal"
-            >
+          >
             Create account
           </button>
         </div>
@@ -126,6 +137,12 @@
           </div>
         </div>
 
+        <!-- ACTIVE TOPIC FILTER BAR -->
+        <div id="activeFilterBar" class="active-filter-bar" hidden>
+          <span id="activeFilterLabel"></span>
+          <button id="clearFilterBtn" class="btn btn-outline-soft btn-sm ms-2">Clear</button>
+        </div>
+
         <!-- DYNAMIC FEED WILL GO HERE -->
         <div id="postList"></div>
       </section>
@@ -134,16 +151,11 @@
       <aside aria-label="Sidebar">
         <div class="sidebar-card">
           <div class="sidebar-title">Popular topics</div>
-          <div class="mb-2">
-            <span class="tag-pill">#introductions</span>
-            <span class="tag-pill">#dailyupdate</span>
-            <span class="tag-pill">#projects</span>
-            <span class="tag-pill">#randomthoughts</span>
+            <div class="mb-2" id="popularTopics"></div>
+            <small class="text-body-secondary">
+              Click a topic to filter the wall by hashtag. Topics with the most likes float to the top.
+            </small>
           </div>
-          <small class="text-body-secondary">
-            When users tag their posts, those topics can surface here so people can browse by interest.
-          </small>
-        </div>
 
         <div class="sidebar-card">
           <div class="sidebar-title">People to follow</div>

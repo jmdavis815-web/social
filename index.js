@@ -112,6 +112,18 @@ if (themeToggle) {
 const USERS_KEY = "openwall-users";           // array of users
 const CURRENT_USER_KEY = "openwall-current";  // current logged-in user
 const POSTS_KEY = "openwall-posts";           // array of posts
+const COMMENTS_KEY = "openwall-comments";     // map: postId -> array of comments
+
+// Currently active topic filter (e.g. "projects", "introductions")
+let activeTopic = null;
+
+// Extract hashtags from post text, e.g. "Loving this #projects #DailyUpdate"
+// → ["projects", "dailyupdate"]
+function extractTagsFromText(text) {
+  if (!text) return [];
+  const matches = text.match(/#(\w+)/g) || [];
+  return matches.map((tag) => tag.slice(1).toLowerCase());
+}
 
 function loadUsers() {
   try {
@@ -156,6 +168,36 @@ function savePosts(posts) {
   localStorage.setItem(POSTS_KEY, JSON.stringify(posts));
 }
 
+// ===========================
+//  COMMENTS (LOCALSTORAGE)
+// ===========================
+function loadCommentsMap() {
+  try {
+    return JSON.parse(localStorage.getItem(COMMENTS_KEY)) || {};
+  } catch (e) {
+    return {};
+  }
+}
+
+function saveCommentsMap(map) {
+  localStorage.setItem(COMMENTS_KEY, JSON.stringify(map));
+}
+
+function getCommentsForPost(postId) {
+  const map = loadCommentsMap();
+  return map[String(postId)] || [];
+}
+
+function addCommentToPost(postId, comment) {
+  const map = loadCommentsMap();
+  const key = String(postId);
+  if (!map[key]) {
+    map[key] = [];
+  }
+  map[key].push(comment);
+  saveCommentsMap(map);
+}
+
 function escapeHtml(str) {
   return String(str)
     .replace(/&/g, "&amp;")
@@ -182,19 +224,183 @@ function timeAgo(timestamp) {
   return new Date(timestamp).toLocaleDateString();
 }
 
+// ===========================
+//  TOPIC STATS & POPULAR TOPICS
+// ===========================
+function computeTopicStats() {
+  const posts = loadPosts();
+  const stats = {};
+
+  posts.forEach((post) => {
+    const tags = post.tags || [];
+    const likes = typeof post.likes === "number" ? post.likes : 0;
+
+    tags.forEach((rawTag) => {
+      const tag = rawTag.toLowerCase();
+      if (!stats[tag]) {
+        stats[tag] = {
+          topic: tag,
+          totalLikes: 0,
+          postCount: 0,
+        };
+      }
+      stats[tag].postCount += 1;
+      stats[tag].totalLikes += likes;
+    });
+  });
+
+  return Object.values(stats).sort((a, b) => {
+    if (b.totalLikes !== a.totalLikes) return b.totalLikes - a.totalLikes;
+    return b.postCount - a.postCount;
+  });
+}
+
+function renderPopularTopics() {
+  const container = document.getElementById("popularTopics");
+  if (!container) return;
+
+  const stats = computeTopicStats();
+  container.innerHTML = "";
+
+  if (!stats.length) {
+    const empty = document.createElement("small");
+    empty.className = "text-body-secondary";
+    empty.textContent = "No hashtags yet. Add #tags in your posts to see topics here.";
+    container.appendChild(empty);
+    return;
+  }
+
+  const topTopics = stats.slice(0, 6); // show top 6
+
+  topTopics.forEach((s) => {
+  const span = document.createElement("span");
+  span.className = "tag-pill";
+  span.dataset.topic = s.topic;
+
+  // Show hashtag + total likes, e.g. "#projects · 19♥"
+  const likes = s.totalLikes || 0;
+  span.textContent = `#${s.topic} · ${likes}♥`;
+
+  // Tooltip with more detail
+  span.title = `${likes} like${likes === 1 ? "" : "s"} across ${
+    s.postCount
+  } post${s.postCount === 1 ? "" : "s"}`;
+
+  container.appendChild(span);
+});
+
+}
+
+// ===========================
+//  ACTIVE FILTER BAR
+// ===========================
+function updateActiveFilterBar() {
+  const feedSection = document.querySelector('section[aria-label="Main feed"]');
+  if (!feedSection) return;
+
+  let bar = document.getElementById("activeFilterBar");
+  if (!bar) {
+    bar = document.createElement("div");
+    bar.id = "activeFilterBar";
+    bar.className = "active-filter-bar";
+
+    // Insert just after the composer card if possible
+    const composer = feedSection.querySelector(".composer-card");
+    if (composer && composer.parentNode) {
+      composer.parentNode.insertBefore(bar, composer.nextSibling);
+    } else {
+      feedSection.prepend(bar);
+    }
+  }
+
+  if (!activeTopic) {
+    bar.style.display = "none";
+    bar.innerHTML = "";
+    return;
+  }
+
+  bar.style.display = "flex";
+  bar.innerHTML = `
+    <span>Filtered by <strong>#${escapeHtml(activeTopic)}</strong></span>
+    <button type="button" class="btn btn-link btn-sm p-0 ms-2 clear-filter-btn">
+      Clear
+    </button>
+  `;
+}
+
+// ===========================
+//  RENDER COMMENTS
+// ===========================
+function renderCommentsForPost(postId, commentsSection) {
+  const listEl = commentsSection.querySelector(".comment-list");
+  if (!listEl) return;
+
+  const comments = getCommentsForPost(postId);
+  listEl.innerHTML = "";
+
+  if (!comments.length) {
+    const empty = document.createElement("div");
+    empty.className = "text-body-secondary small";
+    empty.textContent = "No comments yet. Be the first to reply.";
+    listEl.appendChild(empty);
+    return;
+  }
+
+  comments
+    .slice()
+    .sort((a, b) => a.createdAt - b.createdAt)
+    .forEach((c) => {
+      const item = document.createElement("div");
+      item.className = "comment-item small";
+
+      const when = timeAgo(c.createdAt || Date.now());
+
+      item.innerHTML = `
+        <div class="d-flex justify-content-between">
+          <div>
+            <strong>${escapeHtml(c.name || "Unknown")}</strong>
+            <span class="text-body-secondary ms-1">@${escapeHtml(
+              c.username || "user"
+            )}</span>
+          </div>
+          <span class="text-body-secondary">${when}</span>
+        </div>
+        <div class="comment-body">
+          ${escapeHtml(c.body || "")}
+        </div>
+      `;
+
+      listEl.appendChild(item);
+    });
+}
+
+// ===========================
+//  RENDER POSTS
+// ===========================
 function renderPosts() {
   const container = document.getElementById("postList");
   if (!container) return;
 
-  const posts = loadPosts().slice().sort((a, b) => b.createdAt - a.createdAt);
+  const allPosts = loadPosts().slice().sort((a, b) => b.createdAt - a.createdAt);
+  const commentsMap = loadCommentsMap();
+
+  // If a topic is active, filter posts to those that include that tag
+  const posts = activeTopic
+    ? allPosts.filter((post) => {
+        const tags = post.tags || [];
+        return tags.includes(activeTopic);
+      })
+    : allPosts;
+
   container.innerHTML = "";
 
   if (!posts.length) {
-    // Optional: show an empty state
     const empty = document.createElement("div");
     empty.className = "text-body-secondary small";
     empty.style.padding = "0.5rem 0.25rem";
-    empty.textContent = "No posts yet. Be the first to share something.";
+    empty.textContent = activeTopic
+      ? `No posts found for #${activeTopic}.`
+      : "No posts yet. Be the first to share something.";
     container.appendChild(empty);
     return;
   }
@@ -202,6 +408,7 @@ function renderPosts() {
   posts.forEach((post) => {
     const article = document.createElement("article");
     article.className = "post-card";
+    article.dataset.postId = post.id;
 
     const initials = (post.name || "")
       .split(" ")
@@ -214,6 +421,7 @@ function renderPosts() {
     const when = timeAgo(post.createdAt || Date.now());
     const visibility = post.visibility || "Public";
     const likes = post.likes ?? 0;
+    const commentCount = (commentsMap[String(post.id)] || []).length;
 
     article.innerHTML = `
       <div class="d-flex gap-2">
@@ -221,24 +429,62 @@ function renderPosts() {
         <div class="flex-grow-1">
           <div class="d-flex justify-content-between">
             <div>
-              <span class="post-username">${escapeHtml(post.name || "Unknown")}</span>
-              <span class="post-handle ms-1">@${escapeHtml(post.username || "user")}</span>
+              <span class="post-username">${escapeHtml(
+                post.name || "Unknown"
+              )}</span>
+              <span class="post-handle ms-1">@${escapeHtml(
+                post.username || "user"
+              )}</span>
             </div>
-            <span class="post-meta">${when} · ${escapeHtml(visibility)}</span>
+            <span class="post-meta">${when} · ${escapeHtml(
+              visibility
+            )}</span>
           </div>
           <div class="post-body">
             ${escapeHtml(post.body || "")}
           </div>
           <div class="post-actions">
-            <button type="button">
-              <i>♡</i> ${likes}
+            <button
+              type="button"
+              class="like-btn"
+              data-liked="false"
+              data-count="${likes}"
+            >
+              <span class="heart-icon">♡</span>
+              <span class="like-count">${likes}</span>
             </button>
-            <button type="button">
-              <i>💬</i> 0
+            <button
+              type="button"
+              class="comment-btn"
+              data-post-id="${post.id}"
+            >
+              <i>💬</i>
+              <span class="comment-count">${commentCount}</span>
             </button>
             <button type="button">
               <i>↻</i> Share
             </button>
+          </div>
+
+          <div
+            class="post-comments mt-2"
+            data-comments-for="${post.id}"
+            hidden
+          >
+            <div class="comment-list mb-2"></div>
+            <form class="comment-form d-flex gap-2">
+              <input
+                type="text"
+                class="form-control form-control-sm comment-input"
+                placeholder="Write a comment…"
+              />
+              <button
+                type="submit"
+                class="btn btn-outline-soft btn-sm"
+              >
+                Comment
+              </button>
+            </form>
           </div>
         </div>
       </div>
@@ -248,10 +494,12 @@ function renderPosts() {
   });
 }
 
+// ===========================
+//  INIT POSTS
+// ===========================
 function initPosts() {
   let posts = loadPosts();
   if (!posts.length) {
-    // Seed with a couple of example posts once
     const now = Date.now();
     posts = [
       {
@@ -260,10 +508,11 @@ function initPosts() {
         name: "Michael",
         username: "michael",
         body:
-          "First test of the new OpenWall feed ✅  Soon this page will show real posts from real accounts, always sorted with the latest at the top.",
+          "First test of the new OpenWall feed ✅  Soon this page will show real posts from real accounts, always sorted with the latest at the top. #projects",
         createdAt: now - 2 * 60 * 1000,
         visibility: "Public",
         likes: 12,
+        tags: ["projects"],
       },
       {
         id: now - 2,
@@ -271,10 +520,11 @@ function initPosts() {
         name: "Alex Smith",
         username: "alex",
         body:
-          "Imagine using this feed like a micro-blog: quick updates, photos, or longer reflections. You can follow people you care about and keep everything in one simple stream.",
+          "Imagine using this feed like a micro-blog: quick updates, photos, or longer reflections. You can follow people you care about and keep everything in one simple stream. #dailyupdate",
         createdAt: now - 10 * 60 * 1000,
         visibility: "Public",
         likes: 7,
+        tags: ["dailyupdate"],
       },
       {
         id: now - 1,
@@ -282,15 +532,18 @@ function initPosts() {
         name: "Jordan",
         username: "jordan",
         body:
-          "Next steps: accounts, likes, comments, and the ability to filter your wall by people and tags. For now this layout shows how everything will look when wired to your backend.",
+          "Next steps: accounts, likes, comments, and the ability to filter your wall by people and tags. For now this layout shows how everything will look when wired to your backend. #randomthoughts",
         createdAt: now - 32 * 60 * 1000,
         visibility: "Friends",
         likes: 19,
+        tags: ["randomthoughts"],
       },
     ];
     savePosts(posts);
   }
   renderPosts();
+  renderPopularTopics();
+  updateActiveFilterBar();
 }
 
 // ===========================
@@ -302,7 +555,6 @@ function updateAuthUI() {
   const loginNavBtn = document.getElementById("loginNavBtn");
   const signupNavBtn = document.getElementById("signupNavBtn");
 
-  // Composer elements
   const composerInput = document.querySelector(".composer-input");
   const composerNote = document.querySelector(".composer-note");
 
@@ -310,16 +562,13 @@ function updateAuthUI() {
     ".composer-card button.btn-main"
   );
 
-  // User badge in navbar
   let userBadge = document.getElementById("navUserBadge");
   let logoutBtn = document.getElementById("navLogoutBtn");
 
   if (user) {
-    // Hide login/signup buttons
     if (loginNavBtn) loginNavBtn.style.display = "none";
     if (signupNavBtn) signupNavBtn.style.display = "none";
 
-    // Create user badge + logout button if missing
     const navActionContainer = loginNavBtn
       ? loginNavBtn.parentElement
       : document.querySelector(".navbar .d-flex.align-items-center.gap-2");
@@ -353,13 +602,13 @@ function updateAuthUI() {
       userBadge.textContent = `@${user.username}`;
     }
 
-    // Enable composer for posts
     if (composerInput) {
       composerInput.disabled = false;
       composerInput.placeholder = `Share what's on your mind, ${user.name}…`;
     }
     if (composerNote) {
-      composerNote.textContent = "Your posts will appear at the top of the wall.";
+      composerNote.textContent =
+        "Your posts will appear at the top of the wall.";
     }
     if (composerButton) {
       composerButton.disabled = false;
@@ -368,7 +617,6 @@ function updateAuthUI() {
       composerButton.removeAttribute("data-bs-target");
     }
   } else {
-    // No user: show login/signup, remove badge/logout
     if (loginNavBtn) loginNavBtn.style.display = "";
     if (signupNavBtn) signupNavBtn.style.display = "";
 
@@ -377,7 +625,6 @@ function updateAuthUI() {
     if (logoutBtn && logoutBtn.parentNode)
       logoutBtn.parentNode.removeChild(logoutBtn);
 
-    // Disable composer
     if (composerInput) {
       composerInput.disabled = true;
       composerInput.placeholder = "Share what's on your mind, Michael…";
@@ -405,13 +652,14 @@ updateAuthUI();
 //  COMPOSER HANDLER (CREATE POST)
 // ===========================
 const composerInputEl = document.querySelector(".composer-input");
-const composerButtonEl = document.querySelector(".composer-card button.btn-main");
+const composerButtonEl = document.querySelector(
+  ".composer-card button.btn-main"
+);
 
 if (composerButtonEl && composerInputEl) {
   composerButtonEl.addEventListener("click", () => {
     const user = getCurrentUser();
     if (!user) {
-      // Logged out: let Bootstrap open the login modal via data-bs-* attributes
       return;
     }
 
@@ -430,14 +678,16 @@ if (composerButtonEl && composerInputEl) {
       createdAt: now,
       visibility: "Public",
       likes: 0,
+      tags: extractTagsFromText(text),
     });
 
     savePosts(posts);
     composerInputEl.value = "";
     renderPosts();
+    renderPopularTopics();
+    updateActiveFilterBar();
   });
 
-  // Optional: submit with Enter key
   composerInputEl.addEventListener("keydown", (e) => {
     if (e.key === "Enter") {
       e.preventDefault();
@@ -455,7 +705,8 @@ if (signupForm) {
     e.preventDefault();
 
     const name = document.getElementById("signupName")?.value.trim();
-    const username = document.getElementById("signupUsername")?.value.trim();
+    const username =
+      document.getElementById("signupUsername")?.value.trim();
     const email = document
       .getElementById("signupEmail")
       ?.value.trim()
@@ -481,7 +732,7 @@ if (signupForm) {
       name,
       username,
       email,
-      password, // NOTE: real apps should hash passwords.
+      password,
     };
 
     users.push(newUser);
@@ -489,7 +740,6 @@ if (signupForm) {
     setCurrentUser(newUser);
     updateAuthUI();
 
-    // Close signup modal
     const signupModalEl = document.getElementById("signupModal");
     if (signupModalEl && typeof bootstrap !== "undefined") {
       const modalInstance =
@@ -536,7 +786,6 @@ if (loginForm) {
     setCurrentUser(user);
     updateAuthUI();
 
-    // Close login modal
     const loginModalEl = document.getElementById("loginModal");
     if (loginModalEl && typeof bootstrap !== "undefined") {
       const modalInstance =
@@ -548,3 +797,166 @@ if (loginForm) {
     loginForm.reset();
   });
 }
+
+// ===========================
+//  LIKE BUTTON TOGGLE
+// ===========================
+document.addEventListener("click", function (e) {
+  const btn = e.target.closest(".like-btn");
+  if (!btn) return;
+
+  let liked = btn.getAttribute("data-liked") === "true";
+  let count = parseInt(btn.getAttribute("data-count"), 10) || 0;
+
+  liked = !liked;
+  btn.setAttribute("data-liked", liked);
+
+  count = liked ? count + 1 : Math.max(0, count - 1);
+  btn.setAttribute("data-count", count);
+
+  const heartEl = btn.querySelector(".heart-icon");
+  const countEl = btn.querySelector(".like-count");
+
+  if (heartEl) {
+    heartEl.textContent = liked ? "♥" : "♡";
+  }
+  if (countEl) {
+    countEl.textContent = count;
+  }
+
+  const article = btn.closest(".post-card");
+  if (article && article.dataset.postId) {
+    const postId = Number(article.dataset.postId);
+    const posts = loadPosts();
+    const index = posts.findIndex((p) => p.id === postId);
+    if (index !== -1) {
+      posts[index].likes = count;
+      savePosts(posts);
+      renderPopularTopics(); // likes change topic ranking
+    }
+  }
+});
+
+// ===========================
+//  COMMENT BUTTON TOGGLE PANEL
+// ===========================
+document.addEventListener("click", function (e) {
+  const btn = e.target.closest(".comment-btn");
+  if (!btn) return;
+
+  const article = btn.closest(".post-card");
+  if (!article || !article.dataset.postId) return;
+
+  const postId = Number(article.dataset.postId);
+  const commentsSection = article.querySelector(".post-comments");
+  if (!commentsSection) return;
+
+  const isHidden = commentsSection.hasAttribute("hidden");
+  if (isHidden) {
+    commentsSection.removeAttribute("hidden");
+    renderCommentsForPost(postId, commentsSection);
+    const input = commentsSection.querySelector(".comment-input");
+    if (input) input.focus();
+  } else {
+    commentsSection.setAttribute("hidden", "true");
+  }
+});
+
+// ===========================
+//  COMMENT FORM SUBMIT
+// ===========================
+document.addEventListener("submit", function (e) {
+  const form = e.target.closest(".comment-form");
+  if (!form) return;
+
+  e.preventDefault();
+
+  const user = getCurrentUser();
+  if (!user) {
+    const loginModalEl = document.getElementById("loginModal");
+    if (loginModalEl && typeof bootstrap !== "undefined") {
+      const modalInstance =
+        bootstrap.Modal.getInstance(loginModalEl) ||
+        new bootstrap.Modal(loginModalEl);
+      modalInstance.show();
+    } else {
+      alert("Log in to add a comment.");
+    }
+    return;
+  }
+
+  const article = form.closest(".post-card");
+  if (!article || !article.dataset.postId) return;
+
+  const postId = Number(article.dataset.postId);
+  const input = form.querySelector(".comment-input");
+  if (!input) return;
+
+  const text = input.value.trim();
+  if (!text) return;
+
+  const comment = {
+    id: Date.now(),
+    postId,
+    userId: user.id,
+    username: user.username,
+    name: user.name,
+    body: text,
+    createdAt: Date.now(),
+  };
+
+  addCommentToPost(postId, comment);
+  input.value = "";
+
+  const commentsSection = article.querySelector(".post-comments");
+  if (commentsSection) {
+    renderCommentsForPost(postId, commentsSection);
+  }
+
+  const countEl = article.querySelector(".comment-btn .comment-count");
+  if (countEl) {
+    let currentCount = parseInt(countEl.textContent || "0", 10) || 0;
+    currentCount += 1;
+    countEl.textContent = currentCount;
+  }
+});
+
+// ===========================
+//  TOPIC PILL FILTER HANDLER
+// ===========================
+document.addEventListener("click", function (e) {
+  const clearBtn = e.target.closest(".clear-filter-btn");
+  if (clearBtn) {
+    activeTopic = null;
+    document
+      .querySelectorAll(".tag-pill[data-topic].active")
+      .forEach((el) => el.classList.remove("active"));
+    renderPosts();
+    updateActiveFilterBar();
+    return;
+  }
+
+  const pill = e.target.closest(".tag-pill[data-topic]");
+  if (!pill) return;
+
+  const topic = pill.dataset.topic;
+
+  if (activeTopic === topic) {
+    activeTopic = null;
+    pill.classList.remove("active");
+  } else {
+    activeTopic = topic;
+    document
+      .querySelectorAll(".tag-pill[data-topic].active")
+      .forEach((el) => el.classList.remove("active"));
+    pill.classList.add("active");
+  }
+
+  renderPosts();
+  updateActiveFilterBar();
+
+  const feed = document.querySelector('[aria-label="Main feed"]');
+  if (feed) {
+    feed.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+});

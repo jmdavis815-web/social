@@ -285,6 +285,33 @@
       color: var(--text-muted);
     }
 
+    .tag-pill[data-topic] {
+      cursor: pointer;
+    }
+
+    .tag-pill[data-topic].active {
+      background-color: var(--accent-soft);
+      color: var(--accent);
+      border-color: var(--accent);
+    }
+
+    .active-filter-bar {
+      background-color: var(--accent-soft);
+      color: var(--accent);
+     border: 1px solid var(--accent);
+      padding: 0.5rem 0.75rem;
+      margin-bottom: 0.75rem;
+      border-radius: 0.75rem;
+      display: flex;
+      align-items: center;
+      font-size: 0.9rem;
+    }
+
+    .active-filter-bar button {
+      padding: 0.1rem 0.5rem;
+      font-size: 0.8rem;
+    }
+
     .mini-avatar {
       width: 28px;
       height: 28px;
