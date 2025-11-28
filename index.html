@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light dark">
+  <title>OpenWall — Social Feed</title>
+
+  <link rel="stylesheet" href="style.css">
+  <!-- Bootstrap CSS -->
+  <link
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css"
+    rel="stylesheet"
+    integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
+    crossorigin="anonymous"
+  >
+
+</head>
+<body>
+  <!-- NAVBAR -->
+  <nav class="navbar navbar-expand-lg sticky-top">
+    <div class="container-fluid px-3 px-md-4">
+      <a class="navbar-brand brand-glow" href="#">
+        Open<span>Wall</span>
+      </a>
+
+      <button title="Main Menu" class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+
+      <div class="collapse navbar-collapse" id="mainNav">
+        <ul class="navbar-nav ms-3 me-auto mb-2 mb-lg-0">
+          <li class="nav-item">
+            <a class="nav-link active" aria-current="page" href="#">Home</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="#">Explore</a>
+          </li>
+        </ul>
+
+        <div class="d-flex align-items-center gap-2">
+          <button
+            id="loginNavBtn"
+            class="btn btn-outline-soft btn-sm theme-toggle-btn"
+            type="button"
+            data-bs-toggle="modal"
+            data-bs-target="#loginModal"
+            >
+            Log in
+          </button>
+          <button
+            id="signupNavBtn"
+            class="btn btn-main btn-sm"
+            data-bs-toggle="modal"
+            data-bs-target="#signupModal"
+            >
+            Create account
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </nav>
+
+  <!-- PAGE WRAPPER -->
+  <div class="page-wrapper">
+    <!-- HERO / INTRO -->
+    <section class="hero">
+      <div class="hero-card">
+        <div class="row g-3 align-items-center">
+          <div class="col-md-8">
+            <div class="hero-tag mb-1">Simple social wall</div>
+            <h1 class="hero-title mb-2">
+              Share ideas, updates, and stories in one main feed.
+            </h1>
+            <p class="hero-subtitle mb-3">
+              OpenWall is a clean social space where anyone can post, blog, and comment.
+              Newest posts always appear at the top of the main wall.
+            </p>
+            <div class="d-flex flex-wrap gap-2">
+              <button class="btn btn-main btn-sm" data-bs-toggle="modal" data-bs-target="#signupModal">
+                Get started — it’s free
+              </button>
+              <button class="btn btn-outline-soft btn-sm" data-bs-toggle="modal" data-bs-target="#loginModal">
+                Already have an account?
+              </button>
+            </div>
+          </div>
+          <div class="col-md-4 text-md-end text-start mt-3 mt-md-0">
+            <small class="text-body-secondary d-block mb-2">
+              Live view:
+            </small>
+            <div class="badge rounded-pill px-3 py-2"
+                 style="background-color: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent);">
+              ● Main Wall · Newest posts first
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- MAIN FEED LAYOUT -->
+    <main class="feed-layout">
+      <!-- FEED COLUMN -->
+      <section aria-label="Main feed">
+        <!-- Composer (for logged-in users later) -->
+        <div class="composer-card">
+          <div class="d-flex align-items-start gap-2">
+            <div class="composer-avatar">M</div>
+            <div class="flex-grow-1">
+              <input
+                type="text"
+                class="composer-input"
+                placeholder="Share what's on your mind, Michael…"
+                disabled
+              >
+              <div class="d-flex justify-content-between align-items-center mt-2">
+                <small class="text-body-secondary">
+                  Log in or create an account to start posting.
+                </small>
+                <button class="btn btn-main btn-sm" data-bs-toggle="modal" data-bs-target="#loginModal">
+                  Log in to post
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Example post 1 (Michael) -->
+        <article class="post-card">
+          <div class="d-flex gap-2">
+            <div class="post-avatar">M</div>
+            <div class="flex-grow-1">
+              <div class="d-flex justify-content-between">
+                <div>
+                  <span class="post-username">Michael</span>
+                  <span class="post-handle ms-1">@michael</span>
+                </div>
+                <span class="post-meta">2m ago · Public</span>
+              </div>
+              <div class="post-body">
+                First test of the new OpenWall feed ✅  
+                Soon this page will show real posts from real accounts, always sorted with the latest at the top.
+              </div>
+              <div class="post-actions">
+                <button type="button">
+                  <i>♡</i> 12
+                </button>
+                <button type="button">
+                  <i>💬</i> 3
+                </button>
+                <button type="button">
+                  <i>↻</i> Share
+                </button>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <!-- Example post 2 -->
+        <article class="post-card">
+          <div class="d-flex gap-2">
+            <div class="post-avatar">AS</div>
+            <div class="flex-grow-1">
+              <div class="d-flex justify-content-between">
+                <div>
+                  <span class="post-username">Alex Smith</span>
+                  <span class="post-handle ms-1">@alex</span>
+                </div>
+                <span class="post-meta">10m ago · Public</span>
+              </div>
+              <div class="post-body">
+                Imagine using this feed like a micro-blog: quick updates, photos, or longer reflections.
+                You can follow people you care about and keep everything in one simple stream.
+              </div>
+              <div class="post-actions">
+                <button type="button">
+                  <i>♡</i> 7
+                </button>
+                <button type="button">
+                  <i>💬</i> 1
+                </button>
+                <button type="button">
+                  <i>↻</i> Share
+                </button>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <!-- Example post 3 -->
+        <article class="post-card">
+          <div class="d-flex gap-2">
+            <div class="post-avatar">JR</div>
+            <div class="flex-grow-1">
+              <div class="d-flex justify-content-between">
+                <div>
+                  <span class="post-username">Jordan</span>
+                  <span class="post-handle ms-1">@jordan</span>
+                </div>
+                <span class="post-meta">32m ago · Friends</span>
+              </div>
+              <div class="post-body">
+                Next steps: accounts, likes, comments, and the ability to filter your wall by people and tags.
+                For now this layout shows how everything will look when wired to your backend.
+              </div>
+              <div class="post-actions">
+                <button type="button">
+                  <i>♡</i> 19
+                </button>
+                <button type="button">
+                  <i>💬</i> 5
+                </button>
+                <button type="button">
+                  <i>↻</i> Share
+                </button>
+              </div>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <!-- SIDEBAR COLUMN -->
+      <aside aria-label="Sidebar">
+        <div class="sidebar-card">
+          <div class="sidebar-title">Popular topics</div>
+          <div class="mb-2">
+            <span class="tag-pill">#introductions</span>
+            <span class="tag-pill">#dailyupdate</span>
+            <span class="tag-pill">#projects</span>
+            <span class="tag-pill">#randomthoughts</span>
+          </div>
+          <small class="text-body-secondary">
+            When users tag their posts, those topics can surface here so people can browse by interest.
+          </small>
+        </div>
+
+        <div class="sidebar-card">
+          <div class="sidebar-title">People to follow</div>
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <div class="d-flex align-items-center">
+              <div class="mini-avatar">M</div>
+              <div>
+                <div class="fw-semibold" style="font-size: 0.86rem;">Michael</div>
+                <div class="text-body-secondary" style="font-size: 0.78rem;">
+                  Product updates & notes
+                </div>
+              </div>
+            </div>
+            <button class="btn btn-outline-soft btn-sm px-2 py-1" disabled>Follow</button>
+          </div>
+
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <div class="d-flex align-items-center">
+              <div class="mini-avatar">AS</div>
+              <div>
+                <div class="fw-semibold" style="font-size: 0.86rem;">Alex Smith</div>
+                <div class="text-body-secondary" style="font-size: 0.78rem;">
+                  Tech & creativity
+                </div>
+              </div>
+            </div>
+            <button class="btn btn-outline-soft btn-sm px-2 py-1" disabled>Follow</button>
+          </div>
+
+          <small class="text-body-secondary">
+            Once your auth and database are live, these buttons can call your backend to connect users.
+          </small>
+        </div>
+
+        <div class="sidebar-card">
+          <div class="sidebar-title">What’s next to build?</div>
+          <ol class="mb-0 ps-3 text-body-secondary">
+            <li>Sign-up & login (auth system).</li>
+            <li>Database for posts and users.</li>
+            <li>API endpoints to load and create posts.</li>
+            <li>Replace sample posts with live data.</li>
+          </ol>
+        </div>
+      </aside>
+    </main>
+
+    <footer>
+      © <span id="year"></span> OpenWall · Main Wall Prototype
+    </footer>
+  </div>
+
+    <!-- LOGIN MODAL -->
+<div class="modal fade" id="loginModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="background-color: var(--card-bg); color: var(--text-main); border-radius: 1rem; border: 1px solid var(--card-border);">
+      <div class="modal-header border-0">
+        <h5 class="modal-title">Log in</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="loginForm">
+          <div class="mb-3">
+            <label class="form-label" for="loginEmail">Email</label>
+            <input id="loginEmail" type="email" class="form-control" placeholder="you@example.com" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="loginPassword">Password</label>
+            <input id="loginPassword" type="password" class="form-control" placeholder="••••••••" required>
+          </div>
+          <button type="submit" class="btn btn-main w-100">
+            Log in
+          </button>
+        </form>
+      </div>
+      <div class="modal-footer border-0 justify-content-between">
+        <small class="text-body-secondary">
+          Don’t have an account?
+        </small>
+        <button
+          type="button"
+          class="btn btn-outline-soft btn-sm"
+          data-bs-dismiss="modal"
+          data-bs-toggle="modal"
+          data-bs-target="#signupModal"
+        >
+          Create one
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+  <!-- SIGNUP MODAL -->
+<div class="modal fade" id="signupModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="background-color: var(--card-bg); color: var(--text-main); border-radius: 1rem; border: 1px solid var(--card-border);">
+      <div class="modal-header border-0">
+        <h5 class="modal-title">Create your account</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="signupForm">
+          <div class="mb-3">
+            <label class="form-label" for="signupName">Name</label>
+            <input id="signupName" type="text" class="form-control" placeholder="Your name" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="signupUsername">Username</label>
+            <input id="signupUsername" type="text" class="form-control" placeholder="@username" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="signupEmail">Email</label>
+            <input id="signupEmail" type="email" class="form-control" placeholder="you@example.com" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="signupPassword">Password</label>
+            <input id="signupPassword" type="password" class="form-control" placeholder="Create a password" required>
+          </div>
+          <button type="submit" class="btn btn-main w-100">
+            Sign up
+          </button>
+        </form>
+      </div>
+      <div class="modal-footer border-0 justify-content-between">
+        <small class="text-body-secondary">
+          Already have an account?
+        </small>
+        <button
+          type="button"
+          class="btn btn-outline-soft btn-sm"
+          data-bs-dismiss="modal"
+          data-bs-toggle="modal"
+          data-bs-target="#loginModal"
+        >
+          Log in
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+  <!-- Bootstrap JS -->
+  <script
+    src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"
+    integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/Bmn6P202aB7rN0Pp9+"
+    crossorigin="anonymous">
+  </script>
+
+  <script src="index.js"></script>
+
+</body>
+</html>
