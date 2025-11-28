@@ -198,6 +198,9 @@ function addCommentToPost(postId, comment) {
   saveCommentsMap(map);
 }
 
+// ===========================
+//  UTILS
+// ===========================
 function escapeHtml(str) {
   return String(str)
     .replace(/&/g, "&amp;")
@@ -265,7 +268,8 @@ function renderPopularTopics() {
   if (!stats.length) {
     const empty = document.createElement("small");
     empty.className = "text-body-secondary";
-    empty.textContent = "No hashtags yet. Add #tags in your posts to see topics here.";
+    empty.textContent =
+      "No hashtags yet. Add #tags in your posts to see topics here.";
     container.appendChild(empty);
     return;
   }
@@ -273,59 +277,36 @@ function renderPopularTopics() {
   const topTopics = stats.slice(0, 6); // show top 6
 
   topTopics.forEach((s) => {
-  const span = document.createElement("span");
-  span.className = "tag-pill";
-  span.dataset.topic = s.topic;
+    const span = document.createElement("span");
+    span.className = "tag-pill";
+    span.dataset.topic = s.topic;
 
-  // Show hashtag + total likes, e.g. "#projects · 19♥"
-  const likes = s.totalLikes || 0;
-  span.textContent = `#${s.topic} · ${likes}♥`;
+    const likes = s.totalLikes || 0;
+    span.textContent = `#${s.topic} · ${likes}♥`;
 
-  // Tooltip with more detail
-  span.title = `${likes} like${likes === 1 ? "" : "s"} across ${
-    s.postCount
-  } post${s.postCount === 1 ? "" : "s"}`;
+    span.title = `${likes} like${likes === 1 ? "" : "s"} across ${
+      s.postCount
+    } post${s.postCount === 1 ? "" : "s"}`;
 
-  container.appendChild(span);
-});
-
+    container.appendChild(span);
+  });
 }
 
 // ===========================
 //  ACTIVE FILTER BAR
 // ===========================
-function updateActiveFilterBar() {
-  const feedSection = document.querySelector('section[aria-label="Main feed"]');
-  if (!feedSection) return;
+function renderActiveTopicBar() {
+  const bar = document.getElementById("activeFilterBar");
+  const label = document.getElementById("activeFilterLabel");
 
-  let bar = document.getElementById("activeFilterBar");
-  if (!bar) {
-    bar = document.createElement("div");
-    bar.id = "activeFilterBar";
-    bar.className = "active-filter-bar";
+  if (!bar || !label) return;
 
-    // Insert just after the composer card if possible
-    const composer = feedSection.querySelector(".composer-card");
-    if (composer && composer.parentNode) {
-      composer.parentNode.insertBefore(bar, composer.nextSibling);
-    } else {
-      feedSection.prepend(bar);
-    }
+  if (activeTopic) {
+    label.textContent = `Filtered by #${activeTopic}`;
+    bar.hidden = false;
+  } else {
+    bar.hidden = true;
   }
-
-  if (!activeTopic) {
-    bar.style.display = "none";
-    bar.innerHTML = "";
-    return;
-  }
-
-  bar.style.display = "flex";
-  bar.innerHTML = `
-    <span>Filtered by <strong>#${escapeHtml(activeTopic)}</strong></span>
-    <button type="button" class="btn btn-link btn-sm p-0 ms-2 clear-filter-btn">
-      Clear
-    </button>
-  `;
 }
 
 // ===========================
@@ -384,7 +365,6 @@ function renderPosts() {
   const allPosts = loadPosts().slice().sort((a, b) => b.createdAt - a.createdAt);
   const commentsMap = loadCommentsMap();
 
-  // If a topic is active, filter posts to those that include that tag
   const posts = activeTopic
     ? allPosts.filter((post) => {
         const tags = post.tags || [];
@@ -543,7 +523,7 @@ function initPosts() {
   }
   renderPosts();
   renderPopularTopics();
-  updateActiveFilterBar();
+  renderActiveTopicBar();
 }
 
 // ===========================
@@ -685,7 +665,7 @@ if (composerButtonEl && composerInputEl) {
     composerInputEl.value = "";
     renderPosts();
     renderPopularTopics();
-    updateActiveFilterBar();
+    renderActiveTopicBar();
   });
 
   composerInputEl.addEventListener("keydown", (e) => {
@@ -922,20 +902,27 @@ document.addEventListener("submit", function (e) {
 });
 
 // ===========================
-//  TOPIC PILL FILTER HANDLER
+//  TOPIC PILL FILTER + CLEAR
 // ===========================
 document.addEventListener("click", function (e) {
-  const clearBtn = e.target.closest(".clear-filter-btn");
+  // Clear filter button
+  const clearBtn = e.target.closest("#clearFilterBtn");
   if (clearBtn) {
     activeTopic = null;
     document
       .querySelectorAll(".tag-pill[data-topic].active")
-      .forEach((el) => el.classList.remove("active"));
+      .forEach((pill) => pill.classList.remove("active"));
     renderPosts();
-    updateActiveFilterBar();
+    renderActiveTopicBar();
+    renderPopularTopics();
+    const feed = document.getElementById("postList");
+    if (feed) {
+      feed.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
     return;
   }
 
+  // Topic pill
   const pill = e.target.closest(".tag-pill[data-topic]");
   if (!pill) return;
 
@@ -953,9 +940,9 @@ document.addEventListener("click", function (e) {
   }
 
   renderPosts();
-  updateActiveFilterBar();
+  renderActiveTopicBar();
 
-  const feed = document.querySelector('[aria-label="Main feed"]');
+  const feed = document.getElementById("postList");
   if (feed) {
     feed.scrollIntoView({ behavior: "smooth", block: "start" });
   }
