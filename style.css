@@ -206,6 +206,14 @@
       color: var(--accent);
     }
 
+    .post-avatar-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-radius: inherit;
+      display: block;
+    }
+
     .post-username {
       font-weight: 600;
       font-size: 0.98rem;
@@ -349,3 +357,25 @@
       color: var(--accent);
       border-color: var(--accent);
     }
+
+    /* Profile */
+    .profile-avatar {
+      width: 72px;
+      height: 72px;
+      border-radius: 999px;
+      background: var(--bs-secondary-bg);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      font-size: 1.4rem;
+      flex-shrink: 0;
+    }
+
+  .profile-avatar-img {
+     width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-radius: inherit;
+      display: block;
+}

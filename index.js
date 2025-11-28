@@ -465,15 +465,13 @@ function renderCommentsForPost(postId, commentsSection) {
 // ===========================
 //  RENDER POSTS
 // ===========================
-// ===========================
-//  RENDER POSTS
-// ===========================
 function renderPosts() {
   const container = document.getElementById("postList");
   if (!container) return;
 
   const allPosts = loadPosts().slice().sort((a, b) => b.createdAt - a.createdAt);
   const commentsMap = loadCommentsMap();
+  const users = loadUsers();
 
   const posts = activeTopic
     ? allPosts.filter((post) => {
@@ -500,34 +498,51 @@ function renderPosts() {
     article.className = "post-card";
     article.dataset.postId = post.id;
 
-    const initials = (post.name || "")
-      .split(" ")
-      .filter(Boolean)
-      .map((n) => n[0])
-      .join("")
-      .slice(0, 2)
-      .toUpperCase() || "U";
+    const author = users.find((u) => u.id == post.userId) || {};
+    const initials =
+      (author.name || post.name || "")
+        .split(" ")
+        .filter(Boolean)
+        .map((n) => n[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase() || "U";
 
+    const avatarUrl = author.avatar || null;
     const when = timeAgo(post.createdAt || Date.now());
     const visibility = post.visibility || "Public";
     const likes = post.likes ?? 0;
     const commentCount = (commentsMap[String(post.id)] || []).length;
+
+    const avatarHtml = avatarUrl
+      ? `
+        <div class="post-avatar">
+          <img
+            src="${escapeHtml(avatarUrl)}"
+            alt="${escapeHtml(initials)}"
+            class="post-avatar-img"
+          />
+        </div>
+      `
+      : `<div class="post-avatar">${escapeHtml(initials)}</div>`;
 
     article.innerHTML = `
       <div class="d-flex gap-2">
 
         <!-- CLICKABLE AVATAR -->
         <a href="profile.html?userId=${post.userId}" class="post-avatar-link" style="text-decoration:none;">
-          <div class="post-avatar">${escapeHtml(initials)}</div>
+          ${avatarHtml}
         </a>
 
         <div class="flex-grow-1">
           <div class="d-flex justify-content-between">
 
-            <!-- CLICKABLE NAME — HANDLE REMOVED -->
+            <!-- CLICKABLE NAME -->
             <div>
               <a href="profile.html?userId=${post.userId}" class="post-username-link">
-                <span class="post-username">${escapeHtml(post.name || "Unknown")}</span>
+                <span class="post-username">${escapeHtml(
+                  author.name || post.name || "Unknown"
+                )}</span>
               </a>
             </div>
 

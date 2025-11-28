@@ -7,7 +7,7 @@ if (yearEl) {
 }
 
 // ===========================
-//  THEME TOGGLE
+//  THEME TOGGLE (LIGHT/DARK)
 // ===========================
 const themeToggle = document.getElementById("themeToggle");
 const rootHtml = document.documentElement;
@@ -121,10 +121,6 @@ function loadPosts() {
   }
 }
 
-function savePosts(posts) {
-  localStorage.setItem(POSTS_KEY, JSON.stringify(posts));
-}
-
 function escapeHtml(str) {
   return String(str)
     .replace(/&/g, "&amp;")
@@ -134,10 +130,11 @@ function escapeHtml(str) {
     .replace(/'/g, "&#039;");
 }
 
-function timeAgo(ts) {
+function timeAgo(timestamp) {
   const now = Date.now();
-  const diffMs = now - ts;
+  const diffMs = now - timestamp;
   const diffSec = Math.floor(diffMs / 1000);
+
   if (diffSec < 60) return "Just now";
   const diffMin = Math.floor(diffSec / 60);
   if (diffMin < 60) return `${diffMin}m ago`;
@@ -145,58 +142,29 @@ function timeAgo(ts) {
   if (diffHr < 24) return `${diffHr}h ago`;
   const diffDay = Math.floor(diffHr / 24);
   if (diffDay < 7) return `${diffDay}d ago`;
-  return new Date(ts).toLocaleDateString();
+
+  return new Date(timestamp).toLocaleDateString();
 }
 
-function prettyDate(ts) {
-  return new Date(ts).toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-}
-
-function getQueryParam(name) {
+function getUserIdFromQuery() {
   const params = new URLSearchParams(window.location.search);
-  return params.get(name);
+  const idParam = params.get("userId");
+  if (!idParam) return null;
+
+  const num = Number(idParam);
+  // Allow both numeric and string ids
+  return Number.isNaN(num) ? idParam : num;
 }
 
 // ===========================
-//  PROFILE RENDERING
+//  RENDER: HEADER
 // ===========================
-function computeProfileStats(userId) {
-  const posts = loadPosts().filter((p) => p.userId === userId);
-  const postCount = posts.length;
-  const totalLikes = posts.reduce(
-    (sum, p) => sum + (typeof p.likes === "number" ? p.likes : 0),
-    0
-  );
-  const avgLikes = postCount ? (totalLikes / postCount).toFixed(1) : "0";
+function renderProfileHeader(user, isOwnProfile) {
+  const header = document.getElementById("profileHeader");
+  if (!header) return;
 
-  // top topic from tags
-  const topicCounts = {};
-  posts.forEach((p) => {
-    (p.tags || []).forEach((t) => {
-      const tag = String(t).toLowerCase();
-      topicCounts[tag] = (topicCounts[tag] || 0) + 1;
-    });
-  });
-
-  let topTag = "—";
-  let topCount = 0;
-  Object.entries(topicCounts).forEach(([tag, count]) => {
-    if (count > topCount) {
-      topCount = count;
-      topTag = `#${tag}`;
-    }
-  });
-
-  return { postCount, totalLikes, avgLikes, topTag, posts };
-}
-
-function renderProfileHeader(user, stats) {
   const initials =
-    (user.name || "U")
+    (user.name || "")
       .split(" ")
       .filter(Boolean)
       .map((n) => n[0])
@@ -204,297 +172,318 @@ function renderProfileHeader(user, stats) {
       .slice(0, 2)
       .toUpperCase() || "U";
 
-  const avatarEl = document.getElementById("profileAvatarInitials");
-  const nameEl = document.getElementById("profileName");
-  const handleEl = document.getElementById("profileHandle");
-  const joinedEl = document.getElementById("profileJoined");
-  const postCountEl = document.getElementById("profilePostCount");
-  const likeCountEl = document.getElementById("profileLikeCount");
-  const avgLikesEl = document.getElementById("profileAvgLikes");
-  const topTagEl = document.getElementById("profileTopTag");
+  header.innerHTML = `
+    <div class="card-body d-flex align-items-center gap-3">
+      <div class="profile-avatar">
+        <img
+          id="profileAvatarImage"
+          class="profile-avatar-img d-none"
+          alt="${escapeHtml(initials)}"
+        />
+        <span id="profileAvatarInitials">${escapeHtml(initials)}</span>
+      </div>
 
-  if (avatarEl) avatarEl.textContent = escapeHtml(initials);
-  if (nameEl) nameEl.textContent = user.name || "Unknown user";
-  if (handleEl) handleEl.textContent = `@${user.username || "user"}`;
+      <div class="flex-grow-1">
+        <h1 class="h5 mb-1">${escapeHtml(user.name || "Unnamed user")}</h1>
+        <div class="text-body-secondary small">
+          @${escapeHtml(user.username || "user")}
+        </div>
+      </div>
 
-  if (joinedEl) {
-    if (user.createdAt) {
-      joinedEl.textContent = `Joined ${prettyDate(user.createdAt)}`;
-    } else {
-      joinedEl.textContent = "Joined —";
-    }
-  }
-
-  if (postCountEl) postCountEl.textContent = stats.postCount;
-  if (likeCountEl) likeCountEl.textContent = stats.totalLikes;
-  if (avgLikesEl) avgLikesEl.textContent = stats.avgLikes;
-  if (topTagEl) topTagEl.textContent = stats.topTag;
-
-  document.title = `${user.name || "Profile"} · OpenWall`;
-}
-
-function renderProfileAbout(user) {
-  const bioEl = document.getElementById("profileBioText");
-  const locEl = document.getElementById("profileLocationText");
-  const webLink = document.getElementById("profileWebsiteLink");
-
-  if (bioEl) {
-    bioEl.textContent = user.bio && user.bio.trim()
-      ? user.bio.trim()
-      : "No bio yet.";
-  }
-
-  if (locEl) {
-    locEl.textContent =
-      user.location && user.location.trim() ? user.location.trim() : "—";
-  }
-
-  if (webLink) {
-    if (user.website && user.website.trim()) {
-      let url = user.website.trim();
-      if (!/^https?:\/\//i.test(url)) {
-        url = "https://" + url;
+      ${
+        isOwnProfile
+          ? `
+        <div class="ms-auto d-none d-md-block">
+          <button type="button" id="editProfileScrollBtn" class="btn btn-outline-soft btn-sm">
+            Edit profile
+          </button>
+        </div>
+      `
+          : ""
       }
-      webLink.href = url;
-      webLink.textContent = user.website.trim();
-    } else {
-      webLink.removeAttribute("href");
-      webLink.textContent = "—";
-    }
+    </div>
+  `;
+
+  // Wire up avatar image vs initials
+  const avatarImg = document.getElementById("profileAvatarImage");
+  const avatarInitials = document.getElementById("profileAvatarInitials");
+
+  if (user.avatar && avatarImg) {
+    avatarImg.src = user.avatar;
+    avatarImg.classList.remove("d-none");
+    if (avatarInitials) avatarInitials.style.display = "none";
+  } else {
+    if (avatarImg) avatarImg.classList.add("d-none");
+    if (avatarInitials) avatarInitials.style.display = "inline-flex";
   }
-}
 
-function renderProfileTopics(userId) {
-  const topicsEl = document.getElementById("profileTopics");
-  if (!topicsEl) return;
-
-  const posts = loadPosts().filter((p) => p.userId === userId);
-  const counts = {};
-
-  posts.forEach((p) => {
-    (p.tags || []).forEach((t) => {
-      const tag = String(t).toLowerCase();
-      counts[tag] = (counts[tag] || 0) + 1;
+  // "Edit profile" button scrolls to form
+  const scrollBtn = document.getElementById("editProfileScrollBtn");
+  const editCard = document.getElementById("profileEditCard");
+  if (scrollBtn && editCard) {
+    scrollBtn.addEventListener("click", () => {
+      editCard.scrollIntoView({ behavior: "smooth", block: "start" });
     });
-  });
-
-  topicsEl.innerHTML = "";
-
-  const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
-
-  if (!entries.length) {
-    const small = document.createElement("small");
-    small.className = "text-body-secondary";
-    small.textContent =
-      "Topics this user posts about will appear here as they post.";
-    topicsEl.appendChild(small);
-    return;
   }
-
-  entries.slice(0, 8).forEach(([tag, count]) => {
-    const pill = document.createElement("span");
-    pill.className = "tag-pill";
-    pill.textContent = `#${tag} · ${count}`;
-    topicsEl.appendChild(pill);
-  });
 }
 
-function renderUserProfilePosts(userId) {
-  const container = document.getElementById("profilePostList");
-  if (!container) return;
+// ===========================
+//  RENDER: ABOUT
+// ===========================
+function renderProfileAbout(user) {
+  const about = document.getElementById("profileAbout");
+  if (!about) return;
 
-  const posts = loadPosts()
-    .filter((p) => p.userId === userId)
+  const bio = user.bio || "This user hasn’t written a bio yet.";
+  const location = user.location || "";
+  const website = user.website || "";
+
+  const websiteLink =
+    website && website.trim()
+      ? `<a href="${escapeHtml(website)}" target="_blank" rel="noopener" class="link-body-emphasis small">
+           ${escapeHtml(website)}
+         </a>`
+      : "";
+
+  about.innerHTML = `
+    <div class="card-body">
+      <h2 class="h6 mb-2">About</h2>
+      <p class="mb-2 small">${escapeHtml(bio)}</p>
+
+      <div class="small text-body-secondary">
+        ${
+          location
+            ? `<div><i class="me-1">📍</i>${escapeHtml(location)}</div>`
+            : ""
+        }
+        ${websiteLink ? `<div class="mt-1">🔗 ${websiteLink}</div>` : ""}
+      </div>
+    </div>
+  `;
+}
+
+// ===========================
+//  RENDER: POSTS BY THIS USER
+// ===========================
+function renderProfilePosts(user) {
+  const postsContainer = document.getElementById("profilePosts");
+  if (!postsContainer) return;
+
+  const allPosts = loadPosts();
+  const posts = allPosts
+    .filter((p) => p.userId == user.id) // loose equals to handle string/number
     .slice()
     .sort((a, b) => b.createdAt - a.createdAt);
 
-  container.innerHTML = "";
-
   if (!posts.length) {
-    const empty = document.createElement("div");
-    empty.className = "text-body-secondary small";
-    empty.textContent = "No posts yet.";
-    container.appendChild(empty);
+    postsContainer.innerHTML = `
+      <div class="card-body">
+        <h2 class="h6 mb-2">Posts</h2>
+        <p class="small text-body-secondary mb-0">
+          This user hasn’t posted anything yet.
+        </p>
+      </div>
+    `;
     return;
   }
 
-  posts.forEach((post) => {
-    const article = document.createElement("article");
-    article.className = "post-card mb-2";
+  const initials =
+    (user.name || "")
+      .split(" ")
+      .filter(Boolean)
+      .map((n) => n[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase() || "U";
 
-    const when = timeAgo(post.createdAt || Date.now());
-    const visibility = post.visibility || "Public";
-    const likes = post.likes ?? 0;
+  const avatarHtml = user.avatar
+    ? `<div class="post-avatar">
+         <img src="${escapeHtml(user.avatar)}"
+              alt="${escapeHtml(initials)}"
+              class="post-avatar-img" />
+       </div>`
+    : `<div class="post-avatar">${escapeHtml(initials)}</div>`;
 
-    const initials =
-      (post.name || "")
-        .split(" ")
-        .filter(Boolean)
-        .map((n) => n[0])
-        .join("")
-        .slice(0, 2)
-        .toUpperCase() || "U";
+  const cardsHtml = posts
+    .map((post) => {
+      const when = timeAgo(post.createdAt || Date.now());
+      const visibility = post.visibility || "Public";
 
-    article.innerHTML = `
-      <div class="d-flex gap-2">
-        <div class="post-avatar">${escapeHtml(initials)}</div>
-        <div class="flex-grow-1">
-          <div class="d-flex justify-content-between">
-            <div>
-              <span class="post-username">${escapeHtml(
-                post.name || "Unknown"
-              )}</span>
+      return `
+        <article class="post-card border-0 border-top">
+          <div class="d-flex gap-2">
+            ${avatarHtml}
+            <div class="flex-grow-1">
+              <div class="d-flex justify-content-between">
+                <div>
+                  <span class="post-username">${escapeHtml(
+                    user.name || "Unknown"
+                  )}</span>
+                  <span class="post-handle ms-1">@${escapeHtml(
+                    user.username || "user"
+                  )}</span>
+                </div>
+                <span class="post-meta small text-body-secondary">
+                  ${when} · ${escapeHtml(visibility)}
+                </span>
+              </div>
+              <div class="post-body mt-1 small">
+                ${escapeHtml(post.body || "")}
+              </div>
             </div>
-            <span class="post-meta">${when} · ${escapeHtml(
-      visibility
-    )}</span>
           </div>
-          <div class="post-body">
-            ${escapeHtml(post.body || "")}
-          </div>
-          <div class="post-actions">
-            <button
-              type="button"
-              class="like-btn"
-              data-liked="false"
-              data-count="${likes}"
-              disabled
-            >
-              <span class="heart-icon">♡</span>
-              <span class="like-count">${likes}</span>
-            </button>
-          </div>
-        </div>
-      </div>
-    `;
+        </article>
+      `;
+    })
+    .join("");
 
-    container.appendChild(article);
-  });
+  postsContainer.innerHTML = `
+    <div class="card-body">
+      <h2 class="h6 mb-2">Posts</h2>
+      <div class="profile-post-list">
+        ${cardsHtml}
+      </div>
+    </div>
+  `;
 }
 
 // ===========================
-//  EDIT PROFILE (CURRENT USER)
+//  EDIT PROFILE FORM
 // ===========================
-function enableProfileEditing(user) {
-  const editBtn = document.getElementById("editProfileBtn");
-  const editCard = document.getElementById("profileEditFormCard");
-  const form = document.getElementById("editProfileForm");
-  const cancelBtn = document.getElementById("cancelEdit");
+function setupProfileEditForm(user, isOwnProfile) {
+  const editCard = document.getElementById("profileEditCard");
+  const form = document.getElementById("profileEditForm");
+
+  if (!editCard || !form) return;
+
+  if (!isOwnProfile) {
+    editCard.hidden = true;
+    return;
+  }
+
+  editCard.hidden = false;
 
   const nameInput = document.getElementById("editName");
   const usernameInput = document.getElementById("editUsername");
   const bioInput = document.getElementById("editBio");
   const locationInput = document.getElementById("editLocation");
   const websiteInput = document.getElementById("editWebsite");
+  const avatarInput = document.getElementById("editAvatarInput");
 
-  if (!editBtn || !editCard || !form) return;
+  if (nameInput) nameInput.value = user.name || "";
+  if (usernameInput) usernameInput.value = user.username || "";
+  if (bioInput) bioInput.value = user.bio || "";
+  if (locationInput) locationInput.value = user.location || "";
+  if (websiteInput) websiteInput.value = user.website || "";
 
-  // show edit button
-  editBtn.classList.remove("d-none");
+  // Show a live preview when a new avatar is chosen
+  if (avatarInput) {
+    avatarInput.addEventListener("change", () => {
+      const file = avatarInput.files && avatarInput.files[0];
+      if (!file) return;
 
-  const fillForm = () => {
-    if (nameInput) nameInput.value = user.name || "";
-    if (usernameInput) usernameInput.value = user.username || "";
-    if (bioInput) bioInput.value = user.bio || "";
-    if (locationInput) locationInput.value = user.location || "";
-    if (websiteInput) websiteInput.value = user.website || "";
-  };
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const dataUrl = ev.target?.result;
+        const img = document.getElementById("profileAvatarImage");
+        const initialsSpan = document.getElementById("profileAvatarInitials");
 
-  fillForm();
-
-  editBtn.addEventListener("click", () => {
-    fillForm();
-    editCard.classList.remove("d-none");
-    nameInput && nameInput.focus();
-  });
-
-  if (cancelBtn) {
-    cancelBtn.addEventListener("click", () => {
-      editCard.classList.add("d-none");
+        if (img && typeof dataUrl === "string") {
+          img.src = dataUrl;
+          img.classList.remove("d-none");
+        }
+        if (initialsSpan) {
+          initialsSpan.style.display = "none";
+        }
+      };
+      reader.readAsDataURL(file);
     });
   }
 
   form.addEventListener("submit", (e) => {
     e.preventDefault();
 
-    const newName = (nameInput?.value || "").trim() || "Unknown";
-    const newUsername = (usernameInput?.value || "").trim() || "user";
-    const newBio = (bioInput?.value || "").trim();
-    const newLocation = (locationInput?.value || "").trim();
-    const newWebsite = (websiteInput?.value || "").trim();
-
     const users = loadUsers();
-    const idx = users.findIndex((u) => u.id === user.id);
-    if (idx === -1) {
-      alert("Could not update this profile.");
-      return;
+    const idx = users.findIndex((u) => u.id == user.id);
+    if (idx === -1) return;
+
+    const updatedName = nameInput?.value.trim() || user.name || "";
+    const updatedUsername = usernameInput?.value.trim() || user.username || "";
+    const updatedBio = bioInput?.value.trim() || "";
+    const updatedLocation = locationInput?.value.trim() || "";
+    const updatedWebsite = websiteInput?.value.trim() || "";
+
+    function finalizeSave(avatarDataUrl) {
+      const updatedUser = {
+        ...users[idx],
+        name: updatedName,
+        username: updatedUsername,
+        bio: updatedBio,
+        location: updatedLocation,
+        website: updatedWebsite,
+        avatar: avatarDataUrl || users[idx].avatar || null,
+      };
+
+      users[idx] = updatedUser;
+      saveUsers(users);
+      setCurrentUser(updatedUser);
+
+      // Re-render with new data
+      renderProfileHeader(updatedUser, true);
+      renderProfileAbout(updatedUser);
+      renderProfilePosts(updatedUser);
+
+      alert("Profile updated.");
     }
 
-    const updatedUser = {
-      ...users[idx],
-      name: newName,
-      username: newUsername,
-      bio: newBio,
-      location: newLocation,
-      website: newWebsite,
-    };
-
-    users[idx] = updatedUser;
-    saveUsers(users);
-    setCurrentUser(updatedUser);
-
-    // update all posts for this user with new name/username
-    const posts = loadPosts();
-    posts.forEach((p) => {
-      if (p.userId === updatedUser.id) {
-        p.name = updatedUser.name;
-        p.username = updatedUser.username;
-      }
-    });
-    savePosts(posts);
-
-    const stats = computeProfileStats(updatedUser.id);
-    renderProfileHeader(updatedUser, stats);
-    renderProfileAbout(updatedUser);
-    renderUserProfilePosts(updatedUser.id);
-
-    editCard.classList.add("d-none");
+    const file = avatarInput?.files && avatarInput.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const dataUrl = typeof ev.target?.result === "string"
+          ? ev.target.result
+          : null;
+        finalizeSave(dataUrl);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      // No new image picked - keep existing avatar
+      finalizeSave(null);
+    }
   });
 }
 
 // ===========================
-//  INIT PAGE
+//  MAIN INIT
 // ===========================
 (function initProfilePage() {
+  const userIdFromQuery = getUserIdFromQuery();
   const users = loadUsers();
-  let viewedUser = null;
-
-  const paramId = getQueryParam("userId");
   const currentUser = getCurrentUser();
 
-  if (paramId) {
-    const idNum = Number(paramId);
-    viewedUser = users.find((u) => u.id === idNum) || null;
-  } else if (currentUser) {
-    viewedUser = users.find((u) => u.id === currentUser.id) || null;
+  // Try to find user from query; if none, fall back to current user
+  let profileUser = null;
+  if (userIdFromQuery != null) {
+    profileUser = users.find((u) => u.id == userIdFromQuery) || null;
+  }
+  if (!profileUser && currentUser) {
+    profileUser = users.find((u) => u.id == currentUser.id) || currentUser;
   }
 
-  if (!viewedUser) {
-    const header = document.getElementById("profileHeader");
-    if (header) {
-      header.innerHTML =
-        '<p class="text-danger small mb-0">Profile not found.</p>';
-    }
+  if (!profileUser) {
+    const main = document.getElementById("profileMain") || document.body;
+    const wrapper = document.createElement("div");
+    wrapper.className = "alert alert-warning mt-3";
+    wrapper.textContent =
+      "We couldn’t find that profile in this browser. Try creating an account on the main feed first.";
+    main.appendChild(wrapper);
     return;
   }
 
-  const stats = computeProfileStats(viewedUser.id);
-  renderProfileHeader(viewedUser, stats);
-  renderProfileAbout(viewedUser);
-  renderProfileTopics(viewedUser.id);
-  renderUserProfilePosts(viewedUser.id);
+  const isOwnProfile = currentUser && currentUser.id == profileUser.id;
 
-  if (currentUser && currentUser.id === viewedUser.id) {
-    enableProfileEditing(viewedUser);
-  }
+  renderProfileHeader(profileUser, !!isOwnProfile);
+  renderProfileAbout(profileUser);
+  renderProfilePosts(profileUser);
+  setupProfileEditForm(profileUser, !!isOwnProfile);
 })();

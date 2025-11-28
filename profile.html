@@ -87,60 +87,87 @@
         <div class="col-lg-8">
           <!-- PROFILE HEADER -->
           <section aria-label="User profile">
-            <div class="hero-card mb-3" id="profileHeader">
-              <div class="d-flex align-items-center gap-3">
-                <div class="profile-avatar" id="profileAvatarInitials">
-                  U
-                </div>
-                <div class="flex-grow-1">
-                  <div class="d-flex justify-content-between align-items-start gap-2">
-                    <div>
-                      <h1 class="h5 mb-1" id="profileName">Loading…</h1>
-                      <div
-                        class="text-body-secondary small"
-                        id="profileHandle"
-                      >
-                        @user
-                      </div>
-                      <div
-                        class="text-body-secondary small"
-                        id="profileJoined"
-                      >
-                        Joined —
-                      </div>
-                    </div>
-                    <button
-                      id="editProfileBtn"
-                      class="btn btn-outline-soft btn-sm d-none"
-                      type="button"
-                    >
-                      Edit profile
-                    </button>
-                  </div>
-                </div>
-              </div>
+            <div class="profile-layout">
+  <!-- Header (avatar + name) -->
+  <div class="profile-header card" id="profileHeader"></div>
 
-              <hr class="my-3" />
+  <div class="profile-main">
+    <!-- About card -->
+    <div class="profile-about card" id="profileAbout"></div>
 
-              <div class="row g-3 small">
-                <div class="col-6 col-md-3">
-                  <div class="fw-semibold" id="profilePostCount">0</div>
-                  <div class="text-body-secondary">Posts</div>
-                </div>
-                <div class="col-6 col-md-3">
-                  <div class="fw-semibold" id="profileLikeCount">0</div>
-                  <div class="text-body-secondary">Total likes</div>
-                </div>
-                <div class="col-6 col-md-3">
-                  <div class="fw-semibold" id="profileAvgLikes">0</div>
-                  <div class="text-body-secondary">Avg likes / post</div>
-                </div>
-                <div class="col-6 col-md-3">
-                  <div class="fw-semibold" id="profileTopTag">—</div>
-                  <div class="text-body-secondary">Top topic</div>
-                </div>
-              </div>
+    <!-- Edit Profile (only shown for your own profile) -->
+    <div class="profile-edit card mt-3" id="profileEditCard" hidden>
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h3 class="h6 mb-0">Edit profile</h3>
+        </div>
+
+        <form id="profileEditForm" class="row g-3">
+          <div class="col-md-6">
+            <label for="editName" class="form-label small mb-1">Name</label>
+            <input type="text" id="editName" class="form-control form-control-sm" />
+          </div>
+
+          <div class="col-md-6">
+            <label for="editUsername" class="form-label small mb-1">Username</label>
+            <input type="text" id="editUsername" class="form-control form-control-sm" />
+          </div>
+
+          <div class="col-md-6">
+            <label for="editLocation" class="form-label small mb-1">Location</label>
+            <input type="text" id="editLocation" class="form-control form-control-sm" />
+          </div>
+
+          <div class="col-md-6">
+            <label for="editWebsite" class="form-label small mb-1">Website</label>
+            <input
+              type="url"
+              id="editWebsite"
+              class="form-control form-control-sm"
+              placeholder="https://example.com"
+            />
+          </div>
+
+          <div class="col-12">
+            <label for="editBio" class="form-label small mb-1">Bio</label>
+            <textarea
+              id="editBio"
+              rows="3"
+              class="form-control form-control-sm"
+              placeholder="Tell people a little about yourself…"
+            ></textarea>
+          </div>
+
+          <!-- Avatar upload -->
+          <div class="col-12">
+            <label class="form-label small mb-1" for="editAvatarInput"
+              >Profile picture</label
+            >
+            <input
+              type="file"
+              id="editAvatarInput"
+              class="form-control form-control-sm"
+              accept="image/*"
+            />
+            <div class="form-text small">
+              Square images look best. Your picture is stored only in this browser.
             </div>
+          </div>
+
+          <div class="col-12 d-flex justify-content-end">
+            <button type="submit" class="btn btn-main btn-sm">
+              Save changes
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Posts -->
+    <div class="profile-posts card mt-3" id="profilePosts"></div>
+  </div>
+</div>
+
 
             <!-- ABOUT / BIO DISPLAY -->
             <div class="sidebar-card mb-3" id="profileAboutCard">
