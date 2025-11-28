@@ -101,7 +101,7 @@
 
     <!-- MAIN FEED LAYOUT -->
     <main class="feed-layout">
-      <!-- FEED COLUMN -->
+            <!-- FEED COLUMN -->
       <section aria-label="Main feed">
         <!-- Composer (for logged-in users later) -->
         <div class="composer-card">
@@ -115,7 +115,7 @@
                 disabled
               >
               <div class="d-flex justify-content-between align-items-center mt-2">
-                <small class="text-body-secondary">
+                <small class="text-body-secondary composer-note">
                   Log in or create an account to start posting.
                 </small>
                 <button class="btn btn-main btn-sm" data-bs-toggle="modal" data-bs-target="#loginModal">
@@ -126,98 +126,8 @@
           </div>
         </div>
 
-        <!-- Example post 1 (Michael) -->
-        <article class="post-card">
-          <div class="d-flex gap-2">
-            <div class="post-avatar">M</div>
-            <div class="flex-grow-1">
-              <div class="d-flex justify-content-between">
-                <div>
-                  <span class="post-username">Michael</span>
-                  <span class="post-handle ms-1">@michael</span>
-                </div>
-                <span class="post-meta">2m ago · Public</span>
-              </div>
-              <div class="post-body">
-                First test of the new OpenWall feed ✅  
-                Soon this page will show real posts from real accounts, always sorted with the latest at the top.
-              </div>
-              <div class="post-actions">
-                <button type="button">
-                  <i>♡</i> 12
-                </button>
-                <button type="button">
-                  <i>💬</i> 3
-                </button>
-                <button type="button">
-                  <i>↻</i> Share
-                </button>
-              </div>
-            </div>
-          </div>
-        </article>
-
-        <!-- Example post 2 -->
-        <article class="post-card">
-          <div class="d-flex gap-2">
-            <div class="post-avatar">AS</div>
-            <div class="flex-grow-1">
-              <div class="d-flex justify-content-between">
-                <div>
-                  <span class="post-username">Alex Smith</span>
-                  <span class="post-handle ms-1">@alex</span>
-                </div>
-                <span class="post-meta">10m ago · Public</span>
-              </div>
-              <div class="post-body">
-                Imagine using this feed like a micro-blog: quick updates, photos, or longer reflections.
-                You can follow people you care about and keep everything in one simple stream.
-              </div>
-              <div class="post-actions">
-                <button type="button">
-                  <i>♡</i> 7
-                </button>
-                <button type="button">
-                  <i>💬</i> 1
-                </button>
-                <button type="button">
-                  <i>↻</i> Share
-                </button>
-              </div>
-            </div>
-          </div>
-        </article>
-
-        <!-- Example post 3 -->
-        <article class="post-card">
-          <div class="d-flex gap-2">
-            <div class="post-avatar">JR</div>
-            <div class="flex-grow-1">
-              <div class="d-flex justify-content-between">
-                <div>
-                  <span class="post-username">Jordan</span>
-                  <span class="post-handle ms-1">@jordan</span>
-                </div>
-                <span class="post-meta">32m ago · Friends</span>
-              </div>
-              <div class="post-body">
-                Next steps: accounts, likes, comments, and the ability to filter your wall by people and tags.
-                For now this layout shows how everything will look when wired to your backend.
-              </div>
-              <div class="post-actions">
-                <button type="button">
-                  <i>♡</i> 19
-                </button>
-                <button type="button">
-                  <i>💬</i> 5
-                </button>
-                <button type="button">
-                  <i>↻</i> Share
-                </button>
-              </div>
-            </div>
-          </div>
-        </article>
+        <!-- DYNAMIC FEED WILL GO HERE -->
+        <div id="postList"></div>
       </section>
 
       <!-- SIDEBAR COLUMN -->
@@ -335,6 +245,7 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
+        <!-- IMPORTANT: this id must match the JS -->
         <form id="signupForm">
           <div class="mb-3">
             <label class="form-label" for="signupName">Name</label>
@@ -353,7 +264,7 @@
             <input id="signupPassword" type="password" class="form-control" placeholder="Create a password" required>
           </div>
           <button type="submit" class="btn btn-main w-100">
-            Sign up
+            Create account
           </button>
         </form>
       </div>
@@ -375,13 +286,12 @@
   </div>
 </div>
 
-
   <!-- Bootstrap JS -->
   <script
-    src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"
-    integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/Bmn6P202aB7rN0Pp9+"
-    crossorigin="anonymous">
-  </script>
+  src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"
+  integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI"
+  crossorigin="anonymous">
+</script>
 
   <script src="index.js"></script>
 
