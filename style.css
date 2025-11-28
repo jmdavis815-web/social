@@ -359,23 +359,35 @@
     }
 
     /* Profile */
-    .profile-avatar {
-      width: 72px;
-      height: 72px;
-      border-radius: 999px;
-      background: var(--bs-secondary-bg);
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 600;
-      font-size: 1.4rem;
-      flex-shrink: 0;
-    }
-
-  .profile-avatar-img {
-     width: 100%;
-      height: 100%;
-      object-fit: cover;
-      border-radius: inherit;
-      display: block;
+    /* Profile avatar wrapper */
+.profile-avatar-wrapper {
+  width: 64px;
+  height: 64px;
+  position: relative;
+  border-radius: 50%;
+  overflow: hidden;
 }
+
+/* Actual image avatar */
+.profile-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;   /* keeps it nicely cropped */
+  border-radius: 50%;
+  display: block;
+}
+
+/* Fallback initials avatar */
+.profile-avatar-fallback {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background-color: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+

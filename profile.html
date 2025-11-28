@@ -85,216 +85,98 @@
       <div class="row g-3">
         <!-- PROFILE COLUMN -->
         <div class="col-lg-8">
-          <!-- PROFILE HEADER -->
           <section aria-label="User profile">
             <div class="profile-layout">
-  <!-- Header (avatar + name) -->
-  <div class="profile-header card" id="profileHeader"></div>
+              <!-- Header (avatar + name) -->
+              <div class="profile-header card" id="profileHeader"></div>
 
-  <div class="profile-main">
-    <!-- About card -->
-    <div class="profile-about card" id="profileAbout"></div>
+              <div class="profile-main">
+                <!-- About card -->
+                <div class="profile-about card" id="profileAbout"></div>
 
-    <!-- Edit Profile (only shown for your own profile) -->
-    <div class="profile-edit card mt-3" id="profileEditCard" hidden>
-      <div class="card-body">
-        <div class="d-flex justify-content-between align-items-center mb-2">
-          <h3 class="h6 mb-0">Edit profile</h3>
-        </div>
+                <!-- Edit Profile (only shown for your own profile) -->
+                <div class="profile-edit card mt-3" id="profileEditCard" hidden>
+                  <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                      <h3 class="h6 mb-0">Edit profile</h3>
+                    </div>
 
-        <form id="profileEditForm" class="row g-3">
-          <div class="col-md-6">
-            <label for="editName" class="form-label small mb-1">Name</label>
-            <input type="text" id="editName" class="form-control form-control-sm" />
-          </div>
+                    <form id="profileEditForm" class="row g-3">
+                      <div class="col-md-6">
+                        <label for="editName" class="form-label small mb-1">Name</label>
+                        <input
+                          type="text"
+                          id="editName"
+                          class="form-control form-control-sm"
+                        />
+                      </div>
 
-          <div class="col-md-6">
-            <label for="editUsername" class="form-label small mb-1">Username</label>
-            <input type="text" id="editUsername" class="form-control form-control-sm" />
-          </div>
+                      <div class="col-md-6">
+                        <label for="editUsername" class="form-label small mb-1">Username</label>
+                        <input
+                          type="text"
+                          id="editUsername"
+                          class="form-control form-control-sm"
+                        />
+                      </div>
 
-          <div class="col-md-6">
-            <label for="editLocation" class="form-label small mb-1">Location</label>
-            <input type="text" id="editLocation" class="form-control form-control-sm" />
-          </div>
+                      <div class="col-md-6">
+                        <label for="editLocation" class="form-label small mb-1">Location</label>
+                        <input
+                          type="text"
+                          id="editLocation"
+                          class="form-control form-control-sm"
+                        />
+                      </div>
 
-          <div class="col-md-6">
-            <label for="editWebsite" class="form-label small mb-1">Website</label>
-            <input
-              type="url"
-              id="editWebsite"
-              class="form-control form-control-sm"
-              placeholder="https://example.com"
-            />
-          </div>
+                      <div class="col-md-6">
+                        <label for="editWebsite" class="form-label small mb-1">Website</label>
+                        <input
+                          type="url"
+                          id="editWebsite"
+                          class="form-control form-control-sm"
+                          placeholder="https://example.com"
+                        />
+                      </div>
 
-          <div class="col-12">
-            <label for="editBio" class="form-label small mb-1">Bio</label>
-            <textarea
-              id="editBio"
-              rows="3"
-              class="form-control form-control-sm"
-              placeholder="Tell people a little about yourself…"
-            ></textarea>
-          </div>
+                      <div class="col-12">
+                        <label for="editBio" class="form-label small mb-1">Bio</label>
+                        <textarea
+                          id="editBio"
+                          rows="3"
+                          class="form-control form-control-sm"
+                          placeholder="Tell people a little about yourself…"
+                        ></textarea>
+                      </div>
 
-          <!-- Avatar upload -->
-          <div class="col-12">
-            <label class="form-label small mb-1" for="editAvatarInput"
-              >Profile picture</label
-            >
-            <input
-              type="file"
-              id="editAvatarInput"
-              class="form-control form-control-sm"
-              accept="image/*"
-            />
-            <div class="form-text small">
-              Square images look best. Your picture is stored only in this browser.
-            </div>
-          </div>
+                      <!-- Avatar upload -->
+                      <div class="col-12">
+                        <label class="form-label small mb-1" for="editAvatarInput">
+                          Profile picture
+                        </label>
+                        <input
+                          type="file"
+                          id="editAvatarInput"
+                          class="form-control form-control-sm"
+                          accept="image/*"
+                        />
+                        <div class="form-text small">
+                          Square images look best. Your picture is stored only in this browser.
+                        </div>
+                      </div>
 
-          <div class="col-12 d-flex justify-content-end">
-            <button type="submit" class="btn btn-main btn-sm">
-              Save changes
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-
-    <!-- Posts -->
-    <div class="profile-posts card mt-3" id="profilePosts"></div>
-  </div>
-</div>
-
-
-            <!-- ABOUT / BIO DISPLAY -->
-            <div class="sidebar-card mb-3" id="profileAboutCard">
-              <h2 class="h6 mb-2">About</h2>
-              <p class="mb-2 text-body-secondary" id="profileBioText">
-                No bio yet.
-              </p>
-              <p class="small mb-1">
-                <strong>Location:</strong>
-                <span id="profileLocationText">—</span>
-              </p>
-              <p class="small mb-0">
-                <strong>Website:</strong>
-                <a
-                  href="#"
-                  id="profileWebsiteLink"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  —
-                </a>
-              </p>
-            </div>
-
-            <!-- EDIT PROFILE FORM (only for current user) -->
-            <div
-              class="sidebar-card mb-3 d-none"
-              id="profileEditFormCard"
-            >
-              <h2 class="h6 mb-2">Edit profile</h2>
-              <form id="editProfileForm" class="profile-edit-form">
-                <div class="mb-2">
-                  <label for="editName" class="form-label small mb-1">
-                    Display name
-                  </label>
-                  <input
-                    type="text"
-                    class="form-control form-control-sm"
-                    id="editName"
-                    maxlength="60"
-                  />
-                </div>
-
-                <div class="mb-2">
-                  <label
-                    for="editUsername"
-                    class="form-label small mb-1"
-                  >
-                    Username
-                  </label>
-                  <input
-                    type="text"
-                    class="form-control form-control-sm"
-                    id="editUsername"
-                    maxlength="32"
-                  />
-                </div>
-
-                <div class="mb-2">
-                  <label for="editBio" class="form-label small mb-1">
-                    Bio
-                  </label>
-                  <textarea
-                    id="editBio"
-                    rows="3"
-                    class="form-control form-control-sm"
-                    maxlength="280"
-                  ></textarea>
-                  <div class="form-text small">
-                    Up to 280 characters.
+                      <div class="col-12 d-flex justify-content-end">
+                        <button type="submit" class="btn btn-main btn-sm">
+                          Save changes
+                        </button>
+                      </div>
+                    </form>
                   </div>
                 </div>
 
-                <div class="mb-2">
-                  <label
-                    for="editLocation"
-                    class="form-label small mb-1"
-                  >
-                    Location
-                  </label>
-                  <input
-                    type="text"
-                    class="form-control form-control-sm"
-                    id="editLocation"
-                    maxlength="80"
-                  />
-                </div>
-
-                <div class="mb-3">
-                  <label
-                    for="editWebsite"
-                    class="form-label small mb-1"
-                  >
-                    Website
-                  </label>
-                  <input
-                    type="url"
-                    class="form-control form-control-sm"
-                    id="editWebsite"
-                    placeholder="https://example.com"
-                  />
-                </div>
-
-                <div class="d-flex gap-2">
-                  <button
-                    type="submit"
-                    class="btn btn-main btn-sm"
-                  >
-                    Save changes
-                  </button>
-                  <button
-                    type="button"
-                    id="cancelEdit"
-                    class="btn btn-outline-soft btn-sm"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </form>
-            </div>
-
-            <!-- PROFILE POSTS -->
-            <div class="hero-card">
-              <div class="d-flex justify-content-between align-items-center mb-2">
-                <h2 class="h6 mb-0">Posts</h2>
+                <!-- Posts -->
+                <div class="profile-posts card mt-3" id="profilePosts"></div>
               </div>
-              <div id="profilePostList"></div>
             </div>
           </section>
         </div>
@@ -341,5 +223,31 @@
   ></script>
 
   <script src="profile.js"></script>
+
+  <!-- Toast Container -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 9999">
+
+  <!-- Success Toast -->
+  <div id="toastSuccess" class="toast align-items-center text-bg-success border-0" role="alert">
+    <div class="d-flex">
+      <div class="toast-body">
+        Profile updated successfully!
+      </div>
+      <button title="Success" type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+    </div>
+  </div>
+
+  <!-- Error Toast -->
+  <div id="toastError" class="toast align-items-center text-bg-danger border-0" role="alert">
+    <div class="d-flex">
+      <div class="toast-body">
+        Something went wrong. Please try again.
+      </div>
+      <button title="Something Went Wrong" type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+    </div>
+  </div>
+
+</div>
+
 </body>
 </html>
