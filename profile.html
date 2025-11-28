@@ -1,34 +1,43 @@
 <!DOCTYPE html>
 <html lang="en" data-bs-theme="light">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="color-scheme" content="light dark">
-  <title>OpenWall — Profile</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="light dark" />
+  <title>OpenWall · Profile</title>
 
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css" />
+
   <!-- Bootstrap CSS -->
   <link
     href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css"
     rel="stylesheet"
     integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
     crossorigin="anonymous"
-  >
+  />
 </head>
 <body>
   <!-- NAVBAR -->
   <nav class="navbar navbar-expand-lg sticky-top">
     <div class="container-fluid px-3 px-md-4">
       <a class="navbar-brand brand-glow" href="index.html">
-        Open<span>Wall</span>
+        OPEN<span>WALL</span>
       </a>
 
-      <button title="Main Menu" class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav">
+      <button
+        class="navbar-toggler"
+        type="button"
+        data-bs-toggle="collapse"
+        data-bs-target="#mainNav"
+        aria-controls="mainNav"
+        aria-expanded="false"
+        aria-label="Toggle navigation"
+      >
         <span class="navbar-toggler-icon"></span>
       </button>
 
       <div class="collapse navbar-collapse" id="mainNav">
-        <ul class="navbar-nav ms-3 me-auto mb-2 mb-lg-0">
+        <ul class="navbar-nav me-auto mb-2 mb-lg-0">
           <li class="nav-item">
             <a class="nav-link" href="index.html">Home</a>
           </li>
@@ -38,17 +47,15 @@
         </ul>
 
         <div class="d-flex align-items-center gap-2">
-          <!-- THEME TOGGLE BUTTON -->
           <button
             id="themeToggle"
-            class="btn btn-outline-soft btn-sm theme-toggle-btn"
+            class="btn btn-outline-soft btn-sm"
             type="button"
             aria-label="Switch to dark mode"
           >
-            🌓
+            🌗
           </button>
 
-          <!-- LOGIN / SIGNUP BUTTONS (will be hidden when logged in) -->
           <button
             id="loginNavBtn"
             class="btn btn-outline-soft btn-sm"
@@ -61,10 +68,11 @@
           <button
             id="signupNavBtn"
             class="btn btn-main btn-sm"
+            type="button"
             data-bs-toggle="modal"
             data-bs-target="#signupModal"
           >
-            Create account
+            Sign up
           </button>
         </div>
       </div>
@@ -72,179 +80,238 @@
   </nav>
 
   <!-- PAGE WRAPPER -->
-  <div class="page-wrapper">
-    <section class="hero">
-      <div class="hero-card">
-        <div class="d-flex align-items-center gap-3">
-          <div id="profileAvatar" class="profile-avatar-lg">U</div>
-          <div class="flex-grow-1">
-            <h1 id="profileNameDisplay" class="mb-1 h4 mb-0">User</h1>
-            <div id="profileHandleDisplay" class="text-body-secondary small mb-2">@user</div>
-            <p id="profileBioText" class="mb-0 text-body-secondary small">
-              <!-- bio goes here -->
+  <main class="page-main py-3 py-md-4">
+    <div class="container-fluid px-3 px-md-4">
+      <div class="row g-3">
+        <!-- PROFILE COLUMN -->
+        <div class="col-lg-8">
+          <!-- PROFILE HEADER -->
+          <section aria-label="User profile">
+            <div class="hero-card mb-3" id="profileHeader">
+              <div class="d-flex align-items-center gap-3">
+                <div class="profile-avatar" id="profileAvatarInitials">
+                  U
+                </div>
+                <div class="flex-grow-1">
+                  <div class="d-flex justify-content-between align-items-start gap-2">
+                    <div>
+                      <h1 class="h5 mb-1" id="profileName">Loading…</h1>
+                      <div
+                        class="text-body-secondary small"
+                        id="profileHandle"
+                      >
+                        @user
+                      </div>
+                      <div
+                        class="text-body-secondary small"
+                        id="profileJoined"
+                      >
+                        Joined —
+                      </div>
+                    </div>
+                    <button
+                      id="editProfileBtn"
+                      class="btn btn-outline-soft btn-sm d-none"
+                      type="button"
+                    >
+                      Edit profile
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <hr class="my-3" />
+
+              <div class="row g-3 small">
+                <div class="col-6 col-md-3">
+                  <div class="fw-semibold" id="profilePostCount">0</div>
+                  <div class="text-body-secondary">Posts</div>
+                </div>
+                <div class="col-6 col-md-3">
+                  <div class="fw-semibold" id="profileLikeCount">0</div>
+                  <div class="text-body-secondary">Total likes</div>
+                </div>
+                <div class="col-6 col-md-3">
+                  <div class="fw-semibold" id="profileAvgLikes">0</div>
+                  <div class="text-body-secondary">Avg likes / post</div>
+                </div>
+                <div class="col-6 col-md-3">
+                  <div class="fw-semibold" id="profileTopTag">—</div>
+                  <div class="text-body-secondary">Top topic</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- ABOUT / BIO DISPLAY -->
+            <div class="sidebar-card mb-3" id="profileAboutCard">
+              <h2 class="h6 mb-2">About</h2>
+              <p class="mb-2 text-body-secondary" id="profileBioText">
+                No bio yet.
+              </p>
+              <p class="small mb-1">
+                <strong>Location:</strong>
+                <span id="profileLocationText">—</span>
+              </p>
+              <p class="small mb-0">
+                <strong>Website:</strong>
+                <a
+                  href="#"
+                  id="profileWebsiteLink"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  —
+                </a>
+              </p>
+            </div>
+
+            <!-- EDIT PROFILE FORM (only for current user) -->
+            <div
+              class="sidebar-card mb-3 d-none"
+              id="profileEditFormCard"
+            >
+              <h2 class="h6 mb-2">Edit profile</h2>
+              <form id="editProfileForm" class="profile-edit-form">
+                <div class="mb-2">
+                  <label for="editName" class="form-label small mb-1">
+                    Display name
+                  </label>
+                  <input
+                    type="text"
+                    class="form-control form-control-sm"
+                    id="editName"
+                    maxlength="60"
+                  />
+                </div>
+
+                <div class="mb-2">
+                  <label
+                    for="editUsername"
+                    class="form-label small mb-1"
+                  >
+                    Username
+                  </label>
+                  <input
+                    type="text"
+                    class="form-control form-control-sm"
+                    id="editUsername"
+                    maxlength="32"
+                  />
+                </div>
+
+                <div class="mb-2">
+                  <label for="editBio" class="form-label small mb-1">
+                    Bio
+                  </label>
+                  <textarea
+                    id="editBio"
+                    rows="3"
+                    class="form-control form-control-sm"
+                    maxlength="280"
+                  ></textarea>
+                  <div class="form-text small">
+                    Up to 280 characters.
+                  </div>
+                </div>
+
+                <div class="mb-2">
+                  <label
+                    for="editLocation"
+                    class="form-label small mb-1"
+                  >
+                    Location
+                  </label>
+                  <input
+                    type="text"
+                    class="form-control form-control-sm"
+                    id="editLocation"
+                    maxlength="80"
+                  />
+                </div>
+
+                <div class="mb-3">
+                  <label
+                    for="editWebsite"
+                    class="form-label small mb-1"
+                  >
+                    Website
+                  </label>
+                  <input
+                    type="url"
+                    class="form-control form-control-sm"
+                    id="editWebsite"
+                    placeholder="https://example.com"
+                  />
+                </div>
+
+                <div class="d-flex gap-2">
+                  <button
+                    type="submit"
+                    class="btn btn-main btn-sm"
+                  >
+                    Save changes
+                  </button>
+                  <button
+                    type="button"
+                    id="cancelEdit"
+                    class="btn btn-outline-soft btn-sm"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            <!-- PROFILE POSTS -->
+            <div class="hero-card">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <h2 class="h6 mb-0">Posts</h2>
+              </div>
+              <div id="profilePostList"></div>
+            </div>
+          </section>
+        </div>
+
+        <!-- SIDEBAR -->
+        <aside class="col-lg-4">
+          <section class="sidebar-card mb-3">
+            <h2 class="h6 mb-2">Top topics</h2>
+            <div id="profileTopics" class="d-flex flex-wrap gap-2 small">
+              <small class="text-body-secondary">
+                Topics the user posts about will appear here.
+              </small>
+            </div>
+          </section>
+
+          <section class="sidebar-card small text-body-secondary">
+            <p class="mb-1">
+              Once your auth and database are live, this profile will
+              pull real data from your backend.
             </p>
-          </div>
-          <div class="text-end d-none d-md-block">
-            <div class="profile-stat-label text-body-secondary small mb-1">Stats</div>
-            <div class="profile-stats d-flex gap-3">
-              <div>
-                <div id="profileStatsPosts" class="fw-semibold small">0</div>
-                <div class="text-body-secondary tiny-label">Posts</div>
-              </div>
-              <div>
-                <div id="profileStatsLikes" class="fw-semibold small">0</div>
-                <div class="text-body-secondary tiny-label">Likes</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- EDIT PROFILE CARD -->
-    <main class="profile-layout">
-      <section class="profile-main">
-        <div class="sidebar-card">
-          <div class="sidebar-title mb-2">Edit profile</div>
-          <p id="profileEditNotice" class="text-body-secondary small mb-3">
-            You can update your display name, username, and bio here.
-          </p>
-
-          <form id="profileForm" class="profile-form">
-            <div class="mb-3">
-              <label for="profileName" class="form-label">Display name</label>
-              <input id="profileName" type="text" class="form-control" placeholder="Your name">
-            </div>
-
-            <div class="mb-3">
-              <label for="profileUsername" class="form-label">Username</label>
-              <div class="input-group">
-                <span class="input-group-text">@</span>
-                <input id="profileUsername" type="text" class="form-control" placeholder="username">
-              </div>
-            </div>
-
-            <div class="mb-3">
-              <label for="profileBio" class="form-label">Bio</label>
-              <textarea
-                id="profileBio"
-                class="form-control"
-                rows="3"
-                placeholder="Tell people a little about yourself…"
-              ></textarea>
-            </div>
-
-            <div class="mb-3">
-              <label for="profileLocation" class="form-label">Location</label>
-              <input id="profileLocation" type="text" class="form-control" placeholder="City, Country">
-            </div>
-
-            <div class="mb-3">
-              <label for="profileWebsite" class="form-label">Website</label>
-              <input id="profileWebsite" type="url" class="form-control" placeholder="https://example.com">
-            </div>
-
-            <button type="submit" id="profileSaveBtn" class="btn btn-main w-100">
-              Save changes
-            </button>
-          </form>
-        </div>
-      </section>
-
-      <aside class="profile-sidebar">
-        <div class="sidebar-card">
-          <div class="sidebar-title">Profile summary</div>
-          <ul class="mb-0 list-unstyled small text-body-secondary">
-            <li><span class="fw-semibold">Posts:</span> <span id="profileStatsPostsSide">0</span></li>
-            <li><span class="fw-semibold">Likes received:</span> <span id="profileStatsLikesSide">0</span></li>
-          </ul>
-        </div>
-
-        <div class="sidebar-card">
-          <div class="sidebar-title">Back to main wall</div>
-          <p class="text-body-secondary small mb-2">
-            Return to the main feed to keep posting and exploring.
-          </p>
-          <a href="index.html" class="btn btn-outline-soft btn-sm w-100">
-            ← Back to main wall
-          </a>
-        </div>
-      </aside>
-    </main>
-
-    <footer>
-      © <span id="year"></span> OpenWall · Profile
-    </footer>
-  </div>
-
-  <!-- LOGIN MODAL (reused for when someone lands here logged out) -->
-  <div class="modal fade" id="loginModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-      <div class="modal-content" style="background-color: var(--card-bg); color: var(--text-main); border-radius: 1rem; border: 1px solid var(--card-border);">
-        <div class="modal-header border-0">
-          <h5 class="modal-title">Log in</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body">
-          <form id="loginForm">
-            <div class="mb-3">
-              <label class="form-label" for="loginEmail">Email</label>
-              <input id="loginEmail" type="email" class="form-control" placeholder="you@example.com" required>
-            </div>
-            <div class="mb-3">
-              <label class="form-label" for="loginPassword">Password</label>
-              <input id="loginPassword" type="password" class="form-control" placeholder="••••••••" required>
-            </div>
-            <button type="submit" class="btn btn-main w-100">
-              Log in
-            </button>
-          </form>
-        </div>
+            <p class="mb-0">
+              For now, everything is stored only in this browser.
+            </p>
+          </section>
+        </aside>
       </div>
     </div>
-  </div>
+  </main>
 
-  <!-- SIGNUP MODAL (optional here, but kept consistent) -->
-  <div class="modal fade" id="signupModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-      <div class="modal-content" style="background-color: var(--card-bg); color: var(--text-main); border-radius: 1rem; border: 1px solid var(--card-border);">
-        <div class="modal-header border-0">
-          <h5 class="modal-title">Create your account</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body">
-          <form id="signupForm">
-            <div class="mb-3">
-              <label class="form-label" for="signupName">Name</label>
-              <input id="signupName" type="text" class="form-control" placeholder="Your name" required>
-            </div>
-            <div class="mb-3">
-              <label class="form-label" for="signupUsername">Username</label>
-              <input id="signupUsername" type="text" class="form-control" placeholder="@username" required>
-            </div>
-            <div class="mb-3">
-              <label class="form-label" for="signupEmail">Email</label>
-              <input id="signupEmail" type="email" class="form-control" placeholder="you@example.com" required>
-            </div>
-            <div class="mb-3">
-              <label class="form-label" for="signupPassword">Password</label>
-              <input id="signupPassword" type="password" class="form-control" placeholder="Create a password" required>
-            </div>
-            <button type="submit" class="btn btn-main w-100">
-              Create account
-            </button>
-          </form>
-        </div>
-      </div>
+  <!-- FOOTER -->
+  <footer class="page-footer py-3 mt-4 border-top small text-center">
+    <div class="container-fluid">
+      <span class="text-body-secondary">
+        © <span id="year"></span> OpenWall prototype.
+      </span>
     </div>
-  </div>
+  </footer>
 
   <!-- Bootstrap JS -->
   <script
     src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"
     integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI"
-    crossorigin="anonymous">
-  </script>
+    crossorigin="anonymous"
+  ></script>
 
   <script src="profile.js"></script>
 </body>
