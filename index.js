@@ -1387,3 +1387,26 @@ document.addEventListener("click", function (e) {
     feed.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 });
+
+// ===========================
+//  LOGOUT
+// ===========================
+function updateAuthButtons() {
+  const current = getCurrentUser();
+  const loginBtn = document.getElementById("loginNavBtn");
+  const signupBtn = document.getElementById("signupNavBtn");
+  const logoutBtn = document.getElementById("logoutBtn");
+
+  if (!loginBtn || !signupBtn || !logoutBtn) return;
+
+  if (current) {
+    loginBtn.style.display = "none";
+    signupBtn.style.display = "none";
+    logoutBtn.style.display = "inline-block";
+  } else {
+    loginBtn.style.display = "inline-block";
+    signupBtn.style.display = "inline-block";
+    logoutBtn.style.display = "none";
+  }
+}
+

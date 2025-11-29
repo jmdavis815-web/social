@@ -49,22 +49,17 @@
           </button>
 
           <!-- LOGIN / SIGNUP BUTTONS -->
-          <button
-            id="loginNavBtn"
-            class="btn btn-outline-soft btn-sm"
-            type="button"
-            data-bs-toggle="modal"
-            data-bs-target="#loginModal"
-          >
+          <!-- These show when logged OUT -->
+          <button id="loginNavBtn" class="btn btn-outline-soft btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#loginModal">
             Log in
           </button>
-          <button
-            id="signupNavBtn"
-            class="btn btn-main btn-sm"
-            data-bs-toggle="modal"
-            data-bs-target="#signupModal"
-          >
-            Create account
+          <button id="signupNavBtn" class="btn btn-main btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#signupModal">
+            Sign up
+          </button>
+
+          <!-- This shows when logged IN -->
+          <button id="logoutBtn" class="btn btn-soft btn-sm" style="display:none;">
+            Log out
           </button>
         </div>
       </div>

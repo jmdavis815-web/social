@@ -1112,10 +1112,48 @@ document.addEventListener("click", async function (e) {
 });
 
 // ===========================
+//  LOGOUT
+// ===========================
+function updateAuthButtons() {
+  const current = getCurrentUser();
+  const loginBtn = document.getElementById("loginNavBtn");
+  const signupBtn = document.getElementById("signupNavBtn");
+  const logoutBtn = document.getElementById("logoutBtn");
+
+  if (!loginBtn || !signupBtn || !logoutBtn) return;
+
+  if (current) {
+    loginBtn.style.display = "none";
+    signupBtn.style.display = "none";
+    logoutBtn.style.display = "inline-block";
+  } else {
+    loginBtn.style.display = "inline-block";
+    signupBtn.style.display = "inline-block";
+    logoutBtn.style.display = "none";
+  }
+}
+
+// Handle clicks on the logout button
+document.addEventListener("click", (e) => {
+  const logoutBtn = e.target.closest("#logoutBtn");
+  if (!logoutBtn) return;
+
+  // Clear current user
+  localStorage.removeItem("openwall-current");
+
+  // Refresh navbar buttons
+  updateAuthButtons();
+
+  // Send back to home
+  window.location.href = "index.html";
+});
+
+// ===========================
 //  INIT
 // ===========================
 document.addEventListener("DOMContentLoaded", async () => {
   initToasts();
+  updateAuthButtons(); // ✅ make navbar correct on load
 
   try {
     await Promise.all([
@@ -1130,3 +1168,4 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   renderProfile();
 });
+
