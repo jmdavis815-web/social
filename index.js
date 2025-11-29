@@ -153,6 +153,56 @@ function clearCurrentUser() {
   localStorage.removeItem(CURRENT_USER_KEY);
 }
 
+// Follows: map followerId -> [followedUserId, ...]
+const FOLLOWS_KEY = "openwall-follows";
+
+function loadFollows() {
+  try {
+    return JSON.parse(localStorage.getItem(FOLLOWS_KEY)) || {};
+  } catch (e) {
+    return {};
+  }
+}
+
+function saveFollows(map) {
+  localStorage.setItem(FOLLOWS_KEY, JSON.stringify(map));
+}
+
+function getFollowingIds(userId) {
+  if (!userId) return [];
+  const map = loadFollows();
+  const entry = map[String(userId)];
+  return Array.isArray(entry) ? entry : [];
+}
+
+function isFollowing(followerId, targetId) {
+  if (!followerId || !targetId) return false;
+  const following = getFollowingIds(followerId);
+  return following.includes(targetId);
+}
+
+function toggleFollow(followerId, targetId) {
+  if (!followerId || !targetId || followerId === targetId) return false;
+
+  const map = loadFollows();
+  const key = String(followerId);
+  const list = Array.isArray(map[key]) ? map[key] : [];
+
+  const idx = list.indexOf(targetId);
+  let nowFollowing;
+  if (idx === -1) {
+    list.push(targetId);
+    nowFollowing = true;
+  } else {
+    list.splice(idx, 1);
+    nowFollowing = false;
+  }
+
+  map[key] = list;
+  saveFollows(map);
+  return nowFollowing;
+}
+
 // ===========================
 //  POSTS (LOCALSTORAGE)
 // ===========================
@@ -295,6 +345,9 @@ function renderPopularTopics() {
 // ===========================
 //  USER LIKE STATS & PEOPLE TO FOLLOW
 // ===========================
+// ===========================
+//  USER LIKE STATS & PEOPLE TO FOLLOW
+// ===========================
 function computeUserLikeStats() {
   const posts = loadPosts();
   const users = loadUsers();
@@ -319,21 +372,22 @@ function computeUserLikeStats() {
 
   // Map to include user details
   const result = Object.values(stats)
-    .map((entry) => {
-      const user = users.find((u) => u.id === entry.userId) || {};
-      return {
-        ...entry,
-        name: user.name || "Unknown",
-        username: user.username || "user",
-      };
-    })
-    .sort((a, b) => {
-      // Sort by likes desc, then postCount desc
-      if (b.totalLikes !== a.totalLikes) {
-        return b.totalLikes - a.totalLikes;
-      }
-      return b.postCount - a.postCount;
-    });
+  .map((entry) => {
+    const user = users.find((u) => u.id === entry.userId) || {};
+    return {
+      ...entry,
+      name: user.name || "Unknown",
+      username: user.username || "user",
+      avatarUrl: user.avatarDataUrl || null,
+    };
+  })
+  .sort((a, b) => {
+    // Sort by likes desc, then postCount desc
+    if (b.totalLikes !== a.totalLikes) {
+      return b.totalLikes - a.totalLikes;
+    }
+    return b.postCount - a.postCount;
+  });
 
   return result;
 }
@@ -362,41 +416,67 @@ function renderPeopleToFollow() {
   }
 
   // Show top 3
-  const topUsers = filtered.slice(0, 3);
-
   topUsers.forEach((u) => {
-    const row = document.createElement("div");
-    row.className =
-      "d-flex align-items-center justify-content-between mb-2";
+  const row = document.createElement("div");
+  row.className =
+    "d-flex align-items-center justify-content-between mb-2";
 
-    const initials =
-      (u.name || "")
-        .split(" ")
-        .filter(Boolean)
-        .map((n) => n[0])
-        .join("")
-        .slice(0, 2)
-        .toUpperCase() || "U";
+  const initials =
+    (u.name || "")
+      .split(" ")
+      .filter(Boolean)
+      .map((n) => n[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase() || "U";
 
-    row.innerHTML = `
-      <div class="d-flex align-items-center">
-        <div class="mini-avatar">${escapeHtml(initials)}</div>
-        <div>
-          <div class="fw-semibold" style="font-size: 0.86rem;">
-            ${escapeHtml(u.name)}
-          </div>
-          <div class="text-body-secondary" style="font-size: 0.78rem;">
-            @${escapeHtml(u.username)} · ${u.totalLikes}♥
-          </div>
+  const avatarHtml = u.avatarUrl
+    ? `
+      <div class="mini-avatar">
+        <img
+          src="${escapeHtml(u.avatarUrl)}"
+          alt="${escapeHtml(initials)}"
+          class="post-avatar-img"
+        />
+      </div>
+    `
+    : `<div class="mini-avatar">${escapeHtml(initials)}</div>`;
+
+  const isUserFollowing =
+    currentUser && isFollowing(currentUser.id, u.userId);
+
+  const btnLabel = isUserFollowing ? "Following" : "Follow";
+  const btnClasses = isUserFollowing
+    ? "btn btn-main btn-sm px-2 py-1"
+    : "btn btn-outline-soft btn-sm px-2 py-1";
+
+  row.innerHTML = `
+    <a
+      href="profile.html?userId=${u.userId}"
+      class="d-flex align-items-center text-reset text-decoration-none"
+    >
+      ${avatarHtml}
+      <div>
+        <div class="fw-semibold" style="font-size: 0.86rem;">
+          ${escapeHtml(u.name)}
+        </div>
+        <div class="text-body-secondary" style="font-size: 0.78rem;">
+          @${escapeHtml(u.username)} · ${u.totalLikes}♥
         </div>
       </div>
-      <button class="btn btn-outline-soft btn-sm px-2 py-1" disabled>
-        Follow
-      </button>
-    `;
+    </a>
+    <button
+      class="${btnClasses}"
+      type="button"
+      data-follow-user-id="${u.userId}"
+    >
+      ${btnLabel}
+    </button>
+  `;
 
-    container.appendChild(row);
-  });
+  container.appendChild(row);
+});
+
 }
 
 // ===========================
@@ -508,7 +588,7 @@ function renderPosts() {
         .slice(0, 2)
         .toUpperCase() || "U";
 
-    const avatarUrl = author.avatar || null;
+    const avatarUrl = author.avatarDataUrl || null;
     const when = timeAgo(post.createdAt || Date.now());
     const visibility = post.visibility || "Public";
     const likes = post.likes ?? 0;
@@ -971,6 +1051,40 @@ document.addEventListener("click", function (e) {
       renderPeopleToFollow();  // likes affect people suggestions
     }
   }
+});
+
+// ===========================
+//  FOLLOW / UNFOLLOW BUTTONS
+// ===========================
+document.addEventListener("click", function (e) {
+  const btn = e.target.closest("[data-follow-user-id]");
+  if (!btn) return;
+
+  const current = getCurrentUser();
+  if (!current) {
+    const loginModalEl = document.getElementById("loginModal");
+    if (loginModalEl && typeof bootstrap !== "undefined") {
+      const modalInstance =
+        bootstrap.Modal.getInstance(loginModalEl) ||
+        new bootstrap.Modal(loginModalEl);
+      modalInstance.show();
+    } else {
+      alert("Log in to follow people.");
+    }
+    return;
+  }
+
+  const targetId = Number(btn.getAttribute("data-follow-user-id"));
+  if (!targetId || targetId === current.id) return;
+
+  const nowFollowing = toggleFollow(current.id, targetId);
+
+  btn.textContent = nowFollowing ? "Following" : "Follow";
+  btn.classList.toggle("btn-main", nowFollowing);
+  btn.classList.toggle("btn-outline-soft", !nowFollowing);
+
+  // Refresh suggestions so people you follow can drop out if needed
+  renderPeopleToFollow();
 });
 
 // ===========================

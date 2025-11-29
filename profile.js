@@ -50,6 +50,78 @@ const POSTS_KEY = "openwall-posts";
 const COMMENTS_KEY = "openwall-comments"; // shared with index.js
 const CURRENT_USER_KEY = "openwall-current";
 
+// Follows: followerId -> [followedUserId, ...]
+const FOLLOWS_KEY = "openwall-follows";
+
+function loadFollows() {
+  try {
+    return JSON.parse(localStorage.getItem(FOLLOWS_KEY)) || {};
+  } catch (e) {
+    return {};
+  }
+}
+
+function saveFollows(map) {
+  localStorage.setItem(FOLLOWS_KEY, JSON.stringify(map));
+}
+
+function getFollowingIds(userId) {
+  if (!userId) return [];
+  const map = loadFollows();
+  const entry = map[String(userId)];
+  return Array.isArray(entry) ? entry : [];
+}
+
+function getFollowerIds(userId) {
+  if (!userId) return [];
+  const map = loadFollows();
+  const followers = [];
+
+  for (const [followerId, followingList] of Object.entries(map)) {
+    if (Array.isArray(followingList) && followingList.includes(userId)) {
+      followers.push(Number(followerId));
+    }
+  }
+  return followers;
+}
+
+function isFollowing(followerId, targetId) {
+  if (!followerId || !targetId) return false;
+  const following = getFollowingIds(followerId);
+  return following.includes(targetId);
+}
+
+function toggleFollow(followerId, targetId) {
+  if (!followerId || !targetId || followerId === targetId) return false;
+
+  const map = loadFollows();
+  const key = String(followerId);
+  const list = Array.isArray(map[key]) ? map[key] : [];
+
+  const idx = list.indexOf(targetId);
+  let nowFollowing;
+  if (idx === -1) {
+    list.push(targetId);
+    nowFollowing = true;
+  } else {
+    list.splice(idx, 1);
+    nowFollowing = false;
+  }
+
+  map[key] = list;
+  saveFollows(map);
+  return nowFollowing;
+}
+
+function computeFollowStats(userId) {
+  const followers = getFollowerIds(userId);
+  const following = getFollowingIds(userId);
+  return {
+    followerCount: followers.length,
+    followingCount: following.length,
+  };
+}
+
 function escapeHtml(str) {
   return String(str)
     .replace(/&/g, "&amp;")
@@ -286,46 +358,69 @@ function renderProfileHeader(user, isOwnProfile) {
   if (!headerEl) return;
 
   const stats = computeUserStats(user.id);
+  const followStats = computeFollowStats(user.id);
   const avatarUrl = getAvatarUrlForUser(user);
   const initials = getInitials(user.name);
 
   let avatarInner = "";
-if (avatarUrl) {
-  avatarInner = `
-    <img
-      src="${avatarUrl}"
-      alt="${escapeHtml(user.name || "Avatar")}"
-      class="post-avatar-img"
-    />
-  `;
-} else {
-  avatarInner = escapeHtml(initials);
-}
+  if (avatarUrl) {
+    avatarInner = `<img src="${avatarUrl}" alt="${escapeHtml(
+      user.name || "Avatar"
+    )}" style="width:100%;height:100%;object-fit:cover;" />`;
+  } else {
+    avatarInner = escapeHtml(initials);
+  }
+
+  const currentUser = getCurrentUser();
+  const viewingUserId = currentUser ? currentUser.id : null;
+  const showFollowButton = !isOwnProfile && !!viewingUserId;
+
+  const isUserFollowing =
+    showFollowButton && isFollowing(viewingUserId, user.id);
+
+  const followBtnHtml = showFollowButton
+    ? `
+      <button
+        type="button"
+        class="btn ${isUserFollowing ? "btn-main" : "btn-outline-soft"} btn-sm"
+        data-follow-target-id="${user.id}"
+      >
+        ${isUserFollowing ? "Following" : "Follow"}
+      </button>
+    `
+    : "";
 
   headerEl.innerHTML = `
-    <div class="card-body d-flex align-items-center gap-3">
-      <div class="post-avatar">
-        ${avatarInner}
-      </div>
-      <div>
-        <h1 class="h5 mb-1">${escapeHtml(user.name || "Unnamed user")}</h1>
-        <div class="text-body-secondary small mb-1">
-          @${escapeHtml(user.username || "user")}
-          ${
-            isOwnProfile
-              ? '<span class="ms-1 badge bg-secondary-subtle text-body-secondary border">You</span>'
-              : ""
-          }
+    <div class="card-body d-flex justify-content-between align-items-center gap-3">
+      <div class="d-flex align-items-center gap-3">
+        <div class="post-avatar">
+          ${avatarInner}
         </div>
-        <div class="small text-body-secondary">
-          <span>${stats.postCount} post${
-    stats.postCount === 1 ? "" : "s"
-  }</span>
-          <span class="ms-2">${stats.totalLikes} like${
-    stats.totalLikes === 1 ? "" : "s"
-  }</span>
+        <div>
+          <h1 class="h5 mb-1">${escapeHtml(user.name || "Unnamed user")}</h1>
+          <div class="text-body-secondary small mb-1">
+            @${escapeHtml(user.username || "user")}
+            ${
+              isOwnProfile
+                ? '<span class="ms-1 badge bg-secondary-subtle text-body-secondary border">You</span>'
+                : ""
+            }
+          </div>
+          <div class="small text-body-secondary">
+            <span>${stats.postCount} post${
+              stats.postCount === 1 ? "" : "s"
+            }</span>
+            <span class="ms-2">${stats.totalLikes} like${
+              stats.totalLikes === 1 ? "" : "s"
+            }</span>
+            <span class="ms-2">${followStats.followerCount} follower${
+              followStats.followerCount === 1 ? "" : "s"
+            }</span>
+            <span class="ms-2">${followStats.followingCount} following</span>
+          </div>
         </div>
       </div>
+      ${followBtnHtml}
     </div>
   `;
 }
@@ -447,7 +542,7 @@ function renderCommentsForPost(postId, commentsSection) {
 // ===========================
 //  RENDER PROFILE POSTS
 // ===========================
-function renderProfilePosts(user) {
+function renderProfilePosts(user, isOwnProfile) {
   const postsContainer = document.getElementById("profilePosts");
   if (!postsContainer) return;
 
@@ -455,7 +550,17 @@ function renderProfilePosts(user) {
     .slice()
     .sort((a, b) => b.createdAt - a.createdAt);
 
-  const userPosts = allPosts.filter((p) => p.userId === user.id);
+  const followingIds = isOwnProfile ? getFollowingIds(user.id) : [];
+
+  const visiblePosts = allPosts.filter((p) => {
+    if (isOwnProfile) {
+      // On your own profile: your posts + posts from people you follow
+      return p.userId === user.id || followingIds.includes(p.userId);
+    }
+    // On someone else's profile: only this user's posts
+    return p.userId === user.id;
+  });
+
   const commentsMap = loadCommentsMap();
 
   postsContainer.innerHTML = `
@@ -469,27 +574,30 @@ function renderProfilePosts(user) {
 
   const listEl = postsContainer.querySelector("#profilePostList");
 
-  if (!userPosts.length) {
+  if (!visiblePosts.length) {
     const empty = document.createElement("div");
     empty.className = "text-body-secondary small";
-    empty.textContent = "This user hasn't posted anything yet.";
+    empty.textContent = isOwnProfile
+      ? "You and the people you follow haven't posted anything yet."
+      : "This user hasn't posted anything yet.";
     listEl.appendChild(empty);
     return;
   }
 
-  const initials = getInitials(user.name);
-  const avatarUrl = getAvatarUrlForUser(user);
-  const avatarInner = avatarUrl
-  ? `
-    <img
-      src="${avatarUrl}"
-      alt="${escapeHtml(user.name || "Avatar")}"
-      class="post-avatar-img"
-    />
-  `
-  : escapeHtml(initials);
+  const users = loadUsers();
 
-  userPosts.forEach((post) => {
+  visiblePosts.forEach((post) => {
+    const author =
+      users.find((u) => u.id === post.userId) || user;
+
+    const initials = getInitials(author.name || post.name);
+    const avatarUrl = getAvatarUrlForUser(author);
+    const avatarInner = avatarUrl
+      ? `<img src="${avatarUrl}" alt="${escapeHtml(
+          author.name || "Avatar"
+        )}" style="width:100%;height:100%;object-fit:cover;" />`
+      : escapeHtml(initials);
+
     const when = timeAgo(post.createdAt || Date.now());
     const visibility = post.visibility || "Public";
     const likes = post.likes ?? 0;
@@ -510,10 +618,15 @@ function renderProfilePosts(user) {
           <div class="d-flex justify-content-between">
             <div>
               <span class="post-username">${escapeHtml(
-                post.name || user.name || "Unknown"
+                post.name || author.name || "Unknown"
+              )}</span>
+              <span class="text-body-secondary small ms-1">@${escapeHtml(
+                author.username || post.username || "user"
               )}</span>
             </div>
-            <span class="post-meta">${when} · ${escapeHtml(visibility)}</span>
+            <span class="post-meta">${when} · ${escapeHtml(
+              visibility
+            )}</span>
           </div>
           <div class="post-body">
             ${bodyHtml}
@@ -669,13 +782,14 @@ function setupEditProfileForm(user, isOwnProfile) {
         savePosts(posts);
       }
 
-      // Re-render profile sections
-      renderProfileHeader(updatedUser, true);
-      renderProfileAbout(updatedUser);
-      renderProfileTopics(updatedUser);
-      renderProfilePosts(updatedUser);
+      // Re-render profile sections 
+        renderProfileHeader(updatedUser, true);
+        renderProfileAbout(updatedUser);
+        renderProfileTopics(updatedUser);
+        renderProfilePosts(updatedUser, true);
 
-      showToastSuccess("Profile updated successfully!");
+        showToastSuccess("Profile updated successfully!");
+
     } catch (err) {
       console.error(err);
       showToastError("Something went wrong. Please try again.");
@@ -700,11 +814,12 @@ function renderProfile() {
   const currentUser = getCurrentUser();
   const isOwnProfile = currentUser && currentUser.id === profileUser.id;
 
-  renderProfileHeader(profileUser, isOwnProfile);
-  renderProfileAbout(profileUser);
-  renderProfileTopics(profileUser);
-  renderProfilePosts(profileUser);
-  setupEditProfileForm(profileUser, isOwnProfile);
+    renderProfileHeader(profileUser, isOwnProfile);
+    renderProfileAbout(profileUser);
+    renderProfileTopics(profileUser);
+    renderProfilePosts(profileUser, isOwnProfile);
+    setupEditProfileForm(profileUser, isOwnProfile);
+
 }
 
 // ===========================
@@ -823,6 +938,37 @@ document.addEventListener("submit", function (e) {
     let currentCount = parseInt(countEl.textContent || "0", 10) || 0;
     currentCount += 1;
     countEl.textContent = currentCount;
+  }
+});
+
+// ===========================
+//  FOLLOW / UNFOLLOW ON PROFILE
+// ===========================
+document.addEventListener("click", function (e) {
+  const btn = e.target.closest("[data-follow-target-id]");
+  if (!btn) return;
+
+  const current = getCurrentUser();
+  if (!current) {
+    alert("Log in to follow people.");
+    return;
+  }
+
+  const targetId = Number(btn.getAttribute("data-follow-target-id"));
+  if (!targetId || targetId === current.id) return;
+
+  const nowFollowing = toggleFollow(current.id, targetId);
+
+  btn.textContent = nowFollowing ? "Following" : "Follow";
+  btn.classList.toggle("btn-main", nowFollowing);
+  btn.classList.toggle("btn-outline-soft", !nowFollowing);
+
+  // Re-render header + posts so counts and wall update
+  const profileUser = getProfileUser();
+  if (profileUser) {
+    const isOwnProfile = current.id === profileUser.id;
+    renderProfileHeader(profileUser, isOwnProfile);
+    renderProfilePosts(profileUser, isOwnProfile);
   }
 });
 
