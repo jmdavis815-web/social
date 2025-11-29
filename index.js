@@ -375,7 +375,7 @@ function computeUserLikeStats() {
         ...entry,
         name: user.name || "Unknown",
         username: user.username || "user",
-        avatarUrl: user.avatarDataUrl || null, // ✅ use profile picture
+        avatarUrl: user.avatarDataUrl || user.avatar || null, // ✅ fallback to old avatar too
       };
     })
     .sort((a, b) => {
@@ -440,6 +440,15 @@ function renderPeopleToFollow() {
       `
       : `<div class="mini-avatar">${escapeHtml(initials)}</div>`;
 
+    // Are we already following this user?
+    const isCurrentFollowing =
+      currentUser ? isFollowing(currentUser.id, u.userId) : false;
+
+    const btnLabel = isCurrentFollowing ? "Following" : "Follow";
+    const btnClasses = isCurrentFollowing
+      ? "btn btn-main btn-sm px-2 py-1"
+      : "btn btn-outline-soft btn-sm px-2 py-1";
+
     row.innerHTML = `
       <a
         href="profile.html?userId=${u.userId}"
@@ -455,8 +464,12 @@ function renderPeopleToFollow() {
           </div>
         </div>
       </a>
-      <button class="btn btn-outline-soft btn-sm px-2 py-1" disabled>
-        Follow
+      <button
+        class="${btnClasses}"
+        type="button"
+        data-follow-user-id="${u.userId}"
+      >
+        ${btnLabel}
       </button>
     `;
 
@@ -573,7 +586,7 @@ function renderPosts() {
         .slice(0, 2)
         .toUpperCase() || "U";
 
-    const avatarUrl = author.avatarDataUrl || null;
+    const avatarUrl = author.avatarDataUrl || author.avatar || null;
     const when = timeAgo(post.createdAt || Date.now());
     const visibility = post.visibility || "Public";
     const likes = post.likes ?? 0;
@@ -656,9 +669,6 @@ function renderPosts() {
   });
 }
 
-// ===========================
-//  INIT POSTS
-// ===========================
 // ===========================
 //  INIT POSTS
 // ===========================
