@@ -1,4 +1,50 @@
 // ===========================
+//  FIREBASE APP + FIRESTORE
+// ===========================
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+import {
+  getFirestore,
+  collection,
+  doc,
+  getDocs,
+  setDoc,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  query,
+  where,
+  orderBy,
+} from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+
+// 🔹 Your Firebase web config
+const firebaseConfig = {
+  apiKey: "AIzaSyCx_ChAZXvx1CX-GBNbgiv1znL95z8JCJo",
+  authDomain: "openwall-b9fc7.firebaseapp.com",
+  projectId: "openwall-b9fc7",
+  storageBucket: "openwall-b9fc7.firebasestorage.app",
+  messagingSenderId: "584620300362",
+  appId: "1:584620300362:web:c313bcc2c982b638a16eb3",
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+// Collections
+const usersCol = collection(db, "users");
+const postsCol = collection(db, "posts");
+const followsCol = collection(db, "follows");   // followerId -> targetId
+const commentsCol = collection(db, "comments"); // comments for posts
+
+// ===========================
+//  LOCAL STORAGE KEYS
+// ===========================
+const USERS_KEY = "openwall-users";           // array of users
+const CURRENT_USER_KEY = "openwall-current";  // current logged-in user
+const POSTS_KEY = "openwall-posts";           // array of posts
+const COMMENTS_KEY = "openwall-comments";     // map: postId -> array of comments
+const FOLLOWS_KEY = "openwall-follows";       // map followerId -> [followedUserId, ...]
+
+// ===========================
 //  YEAR IN FOOTER
 // ===========================
 const yearEl = document.getElementById("year");
@@ -60,7 +106,7 @@ if (themeToggle) {
   banner.style.padding = "0.35rem 0.75rem";
 
   banner.innerHTML = `
-    This is a front-end prototype. Login & posts are stored only in this browser.
+    This is a front-end prototype. Data is stored in Firestore + this browser.
     <button
       type="button"
       id="dismissPrototypeBanner"
@@ -107,18 +153,10 @@ if (themeToggle) {
 })();
 
 // ===========================
-//  SIMPLE AUTH (LOCALSTORAGE)
+//  SIMPLE AUTH HELPERS
 // ===========================
-const USERS_KEY = "openwall-users";           // array of users
-const CURRENT_USER_KEY = "openwall-current";  // current logged-in user
-const POSTS_KEY = "openwall-posts";           // array of posts
-const COMMENTS_KEY = "openwall-comments";     // map: postId -> array of comments
+let activeTopic = null; // current hashtag filter
 
-// Currently active topic filter (e.g. "projects", "introductions")
-let activeTopic = null;
-
-// Extract hashtags from post text, e.g. "Loving this #projects #DailyUpdate"
-// → ["projects", "dailyupdate"]
 function extractTagsFromText(text) {
   if (!text) return [];
   const matches = text.match(/#(\w+)/g) || [];
@@ -128,7 +166,7 @@ function extractTagsFromText(text) {
 function loadUsers() {
   try {
     return JSON.parse(localStorage.getItem(USERS_KEY)) || [];
-  } catch (e) {
+  } catch {
     return [];
   }
 }
@@ -140,7 +178,7 @@ function saveUsers(users) {
 function getCurrentUser() {
   try {
     return JSON.parse(localStorage.getItem(CURRENT_USER_KEY));
-  } catch (e) {
+  } catch {
     return null;
   }
 }
@@ -153,13 +191,49 @@ function clearCurrentUser() {
   localStorage.removeItem(CURRENT_USER_KEY);
 }
 
-// Follows: map followerId -> [followedUserId, ...]
-const FOLLOWS_KEY = "openwall-follows";
+function loadPosts() {
+  try {
+    return JSON.parse(localStorage.getItem(POSTS_KEY)) || [];
+  } catch {
+    return [];
+  }
+}
+
+function savePosts(posts) {
+  localStorage.setItem(POSTS_KEY, JSON.stringify(posts));
+}
+
+function loadCommentsMap() {
+  try {
+    return JSON.parse(localStorage.getItem(COMMENTS_KEY)) || {};
+  } catch {
+    return {};
+  }
+}
+
+function saveCommentsMap(map) {
+  localStorage.setItem(COMMENTS_KEY, JSON.stringify(map));
+}
+
+function getCommentsForPost(postId) {
+  const map = loadCommentsMap();
+  return map[String(postId)] || [];
+}
+
+function addCommentToLocal(postId, comment) {
+  const map = loadCommentsMap();
+  const key = String(postId);
+  if (!map[key]) {
+    map[key] = [];
+  }
+  map[key].push(comment);
+  saveCommentsMap(map);
+}
 
 function loadFollows() {
   try {
     return JSON.parse(localStorage.getItem(FOLLOWS_KEY)) || {};
-  } catch (e) {
+  } catch {
     return {};
   }
 }
@@ -181,7 +255,7 @@ function isFollowing(followerId, targetId) {
   return following.includes(targetId);
 }
 
-function toggleFollow(followerId, targetId) {
+function toggleFollowLocal(followerId, targetId) {
   if (!followerId || !targetId || followerId === targetId) return false;
 
   const map = loadFollows();
@@ -201,51 +275,6 @@ function toggleFollow(followerId, targetId) {
   map[key] = list;
   saveFollows(map);
   return nowFollowing;
-}
-
-// ===========================
-//  POSTS (LOCALSTORAGE)
-// ===========================
-function loadPosts() {
-  try {
-    return JSON.parse(localStorage.getItem(POSTS_KEY)) || [];
-  } catch (e) {
-    return [];
-  }
-}
-
-function savePosts(posts) {
-  localStorage.setItem(POSTS_KEY, JSON.stringify(posts));
-}
-
-// ===========================
-//  COMMENTS (LOCALSTORAGE)
-// ===========================
-function loadCommentsMap() {
-  try {
-    return JSON.parse(localStorage.getItem(COMMENTS_KEY)) || {};
-  } catch (e) {
-    return {};
-  }
-}
-
-function saveCommentsMap(map) {
-  localStorage.setItem(COMMENTS_KEY, JSON.stringify(map));
-}
-
-function getCommentsForPost(postId) {
-  const map = loadCommentsMap();
-  return map[String(postId)] || [];
-}
-
-function addCommentToPost(postId, comment) {
-  const map = loadCommentsMap();
-  const key = String(postId);
-  if (!map[key]) {
-    map[key] = [];
-  }
-  map[key].push(comment);
-  saveCommentsMap(map);
 }
 
 // ===========================
@@ -273,7 +302,6 @@ function timeAgo(timestamp) {
   const diffDay = Math.floor(diffHr / 24);
   if (diffDay < 7) return `${diffDay}d ago`;
 
-  // Fallback to date
   return new Date(timestamp).toLocaleDateString();
 }
 
@@ -324,7 +352,7 @@ function renderPopularTopics() {
     return;
   }
 
-  const topTopics = stats.slice(0, 6); // show top 6
+  const topTopics = stats.slice(0, 6);
 
   topTopics.forEach((s) => {
     const span = document.createElement("span");
@@ -350,7 +378,6 @@ function computeUserLikeStats() {
   const users = loadUsers();
   const stats = {};
 
-  // Sum likes per userId
   posts.forEach((post) => {
     const userId = post.userId;
     if (!userId) return;
@@ -367,15 +394,14 @@ function computeUserLikeStats() {
     stats[userId].totalLikes += likes;
   });
 
-  // Map to include user details
   const result = Object.values(stats)
     .map((entry) => {
-      const user = users.find((u) => u.id === entry.userId) || {};
+      const user = users.find((u) => u.id == entry.userId) || {};
       return {
         ...entry,
         name: user.name || "Unknown",
         username: user.username || "user",
-        avatarUrl: user.avatarDataUrl || user.avatar || null, // ✅ fallback to old avatar too
+        avatarUrl: user.avatarDataUrl || user.avatar || null,
       };
     })
     .sort((a, b) => {
@@ -397,7 +423,6 @@ function renderPeopleToFollow() {
 
   container.innerHTML = "";
 
-  // Filter out current user if logged in
   const filtered = currentUser
     ? stats.filter((s) => s.userId !== currentUser.id)
     : stats;
@@ -411,7 +436,6 @@ function renderPeopleToFollow() {
     return;
   }
 
-  // Show top 3
   const topUsers = filtered.slice(0, 3);
 
   topUsers.forEach((u) => {
@@ -440,7 +464,6 @@ function renderPeopleToFollow() {
       `
       : `<div class="mini-avatar">${escapeHtml(initials)}</div>`;
 
-    // Are we already following this user?
     const isCurrentFollowing =
       currentUser ? isFollowing(currentUser.id, u.userId) : false;
 
@@ -547,7 +570,9 @@ function renderPosts() {
   const container = document.getElementById("postList");
   if (!container) return;
 
-  const allPosts = loadPosts().slice().sort((a, b) => b.createdAt - a.createdAt);
+  const allPosts = loadPosts()
+    .slice()
+    .sort((a, b) => b.createdAt - a.createdAt);
   const commentsMap = loadCommentsMap();
   const users = loadUsers();
 
@@ -606,16 +631,12 @@ function renderPosts() {
 
     article.innerHTML = `
       <div class="d-flex gap-2">
-
-        <!-- CLICKABLE AVATAR -->
         <a href="profile.html?userId=${post.userId}" class="post-avatar-link" style="text-decoration:none;">
           ${avatarHtml}
         </a>
 
         <div class="flex-grow-1">
           <div class="d-flex justify-content-between">
-
-            <!-- CLICKABLE NAME -->
             <div>
               <a href="profile.html?userId=${post.userId}" class="post-username-link">
                 <span class="post-username">${escapeHtml(
@@ -670,12 +691,59 @@ function renderPosts() {
 }
 
 // ===========================
-//  INIT POSTS
+//  FIRESTORE SYNC
 // ===========================
-function initPosts() {
-  // Seed demo posts if none exist
-  let posts = loadPosts();
-  if (!posts.length) {
+async function syncUsersFromFirestore() {
+  const usersSnap = await getDocs(usersCol);
+  let users = [];
+
+  if (usersSnap.empty) {
+    // Seed demo users into Firestore
+    users = [
+      {
+        id: 1,
+        name: "Michael",
+        username: "michael",
+        email: "michael@example.com",
+        password: "demo",
+      },
+      {
+        id: 2,
+        name: "Alex Smith",
+        username: "alex",
+        email: "alex@example.com",
+        password: "demo",
+      },
+      {
+        id: 3,
+        name: "Jordan",
+        username: "jordan",
+        email: "jordan@example.com",
+        password: "demo",
+      },
+    ];
+
+    for (const u of users) {
+      await setDoc(doc(usersCol, String(u.id)), u);
+    }
+  } else {
+    users = usersSnap.docs.map((d) => {
+      const data = d.data();
+      return {
+        id: data.id ?? Number(d.id),
+        ...data,
+      };
+    });
+  }
+
+  saveUsers(users);
+}
+
+async function syncPostsFromFirestore() {
+  const postsSnap = await getDocs(query(postsCol, orderBy("createdAt", "desc")));
+  let posts = [];
+
+  if (postsSnap.empty) {
     const now = Date.now();
     posts = [
       {
@@ -715,42 +783,58 @@ function initPosts() {
         tags: ["randomthoughts"],
       },
     ];
-    savePosts(posts);
+
+    for (const p of posts) {
+      await setDoc(doc(postsCol, String(p.id)), p);
+    }
+  } else {
+    posts = postsSnap.docs.map((d) => {
+      const data = d.data();
+      return {
+        id: data.id ?? Number(d.id),
+        ...data,
+      };
+    });
   }
 
-  // ✅ Seed demo users to match those posts, if no users yet
-  let users = loadUsers();
-  if (!users.length) {
-    users = [
-      {
-        id: 1,
-        name: "Michael",
-        username: "michael",
-        email: "michael@example.com",
-        password: "demo",
-      },
-      {
-        id: 2,
-        name: "Alex Smith",
-        username: "alex",
-        email: "alex@example.com",
-        password: "demo",
-      },
-      {
-        id: 3,
-        name: "Jordan",
-        username: "jordan",
-        email: "jordan@example.com",
-        password: "demo",
-      },
-    ];
-    saveUsers(users);
-  }
+  savePosts(posts);
+}
 
+async function syncFollowsFromFirestore() {
+  const snap = await getDocs(followsCol);
+  const map = {};
+  snap.forEach((d) => {
+    const data = d.data();
+    const followerId = String(data.followerId);
+    const targetId = data.targetId;
+    if (!map[followerId]) map[followerId] = [];
+    if (!map[followerId].includes(targetId)) {
+      map[followerId].push(targetId);
+    }
+  });
+  saveFollows(map);
+}
+
+async function syncCommentsFromFirestore() {
+  const snap = await getDocs(commentsCol);
+  const map = {};
+  snap.forEach((d) => {
+    const c = d.data();
+    const key = String(c.postId);
+    if (!map[key]) map[key] = [];
+    map[key].push(c);
+  });
+  saveCommentsMap(map);
+}
+
+// ===========================
+//  INIT POSTS
+// ===========================
+function initPosts() {
   renderPosts();
   renderPopularTopics();
   renderActiveTopicBar();
-  renderPeopleToFollow(); // make People to follow work from the start
+  renderPeopleToFollow();
 }
 
 // ===========================
@@ -781,7 +865,6 @@ function updateAuthUI() {
       : document.querySelector(".navbar .d-flex.align-items-center.gap-2");
 
     if (navActionContainer) {
-      // create badge as a LINK to the profile
       if (!userBadge) {
         userBadge = document.createElement("a");
         userBadge.id = "navUserBadge";
@@ -818,7 +901,8 @@ function updateAuthUI() {
       composerInput.placeholder = `Share what's on your mind, ${user.name}…`;
     }
     if (composerNote) {
-      composerNote.textContent = "Your posts will appear at the top of the wall.";
+      composerNote.textContent =
+        "Your posts will appear at the top of the wall.";
     }
     if (composerButton) {
       composerButton.disabled = false;
@@ -840,7 +924,8 @@ function updateAuthUI() {
       composerInput.placeholder = "Share what's on your mind, Michael…";
     }
     if (composerNote) {
-      composerNote.textContent = "Log in or create an account to start posting.";
+      composerNote.textContent =
+        "Log in or create an account to start posting.";
     }
     if (composerButton) {
       composerButton.disabled = false;
@@ -852,10 +937,20 @@ function updateAuthUI() {
 }
 
 // ===========================
-//  INIT POSTS + AUTH UI
+//  APP INIT (SYNC + RENDER)
 // ===========================
-initPosts();
-updateAuthUI();
+(async function initApp() {
+  try {
+    await syncUsersFromFirestore();
+    await syncPostsFromFirestore();
+    await syncFollowsFromFirestore();
+    await syncCommentsFromFirestore();
+  } catch (err) {
+    console.error("Error syncing from Firestore:", err);
+  }
+  initPosts();
+  updateAuthUI();
+})();
 
 // ===========================
 //  COMPOSER HANDLER (CREATE POST)
@@ -866,7 +961,7 @@ const composerButtonEl = document.querySelector(
 );
 
 if (composerButtonEl && composerInputEl) {
-  composerButtonEl.addEventListener("click", () => {
+  composerButtonEl.addEventListener("click", async () => {
     const user = getCurrentUser();
     if (!user) {
       return;
@@ -878,7 +973,7 @@ if (composerButtonEl && composerInputEl) {
     const posts = loadPosts();
     const now = Date.now();
 
-    posts.push({
+    const newPost = {
       id: now,
       userId: user.id,
       name: user.name,
@@ -888,14 +983,23 @@ if (composerButtonEl && composerInputEl) {
       visibility: "Public",
       likes: 0,
       tags: extractTagsFromText(text),
-    });
+    };
 
+    posts.push(newPost);
     savePosts(posts);
+
+    // Write to Firestore
+    try {
+      await setDoc(doc(postsCol, String(newPost.id)), newPost);
+    } catch (err) {
+      console.error("Error writing post to Firestore:", err);
+    }
+
     composerInputEl.value = "";
     renderPosts();
     renderPopularTopics();
     renderActiveTopicBar();
-    renderPeopleToFollow(); // new post can affect suggestions
+    renderPeopleToFollow();
   });
 
   composerInputEl.addEventListener("keydown", (e) => {
@@ -907,11 +1011,11 @@ if (composerButtonEl && composerInputEl) {
 }
 
 // ===========================
-//  SIGNUP HANDLER
+//  SIGNUP HANDLER (Firestored)
 // ===========================
 const signupForm = document.getElementById("signupForm");
 if (signupForm) {
-  signupForm.addEventListener("submit", (e) => {
+  signupForm.addEventListener("submit", async (e) => {
     e.preventDefault();
 
     const name = document.getElementById("signupName")?.value.trim();
@@ -930,44 +1034,57 @@ if (signupForm) {
       return;
     }
 
-    const users = loadUsers();
-    const existing = users.find((u) => u.email === email);
-    if (existing) {
-      alert("An account with that email already exists. Try logging in.");
-      return;
+    try {
+      // Check if email already exists in Firestore
+      const q = query(usersCol, where("email", "==", email));
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        alert("An account with that email already exists. Try logging in.");
+        return;
+      }
+
+      const id = Date.now(); // numeric id
+      const newUser = {
+        id,
+        name,
+        username,
+        email,
+        password, // demo only (not secure)
+      };
+
+      // Save to Firestore
+      await setDoc(doc(usersCol, String(id)), newUser);
+
+      // Update local cache
+      const users = loadUsers();
+      users.push(newUser);
+      saveUsers(users);
+
+      setCurrentUser(newUser);
+      updateAuthUI();
+
+      const signupModalEl = document.getElementById("signupModal");
+      if (signupModalEl && typeof bootstrap !== "undefined") {
+        const modalInstance =
+          bootstrap.Modal.getInstance(signupModalEl) ||
+          new bootstrap.Modal(signupModalEl);
+        modalInstance.hide();
+      }
+
+      signupForm.reset();
+    } catch (err) {
+      console.error("Error signing up:", err);
+      alert("There was an error creating your account. Please try again.");
     }
-
-    const newUser = {
-      id: Date.now(),
-      name,
-      username,
-      email,
-      password,
-    };
-
-    users.push(newUser);
-    saveUsers(users);
-    setCurrentUser(newUser);
-    updateAuthUI();
-
-    const signupModalEl = document.getElementById("signupModal");
-    if (signupModalEl && typeof bootstrap !== "undefined") {
-      const modalInstance =
-        bootstrap.Modal.getInstance(signupModalEl) ||
-        new bootstrap.Modal(signupModalEl);
-      modalInstance.hide();
-    }
-
-    signupForm.reset();
   });
 }
 
 // ===========================
-//  LOGIN HANDLER
+//  LOGIN HANDLER (Firestored)
 // ===========================
 const loginForm = document.getElementById("loginForm");
 if (loginForm) {
-  loginForm.addEventListener("submit", (e) => {
+  loginForm.addEventListener("submit", async (e) => {
     e.preventDefault();
 
     const email = document
@@ -983,35 +1100,62 @@ if (loginForm) {
       return;
     }
 
-    const users = loadUsers();
-    const user = users.find(
-      (u) => u.email === email && u.password === password
-    );
+    try {
+      const q = query(
+        usersCol,
+        where("email", "==", email),
+        where("password", "==", password)
+      );
+      const snap = await getDocs(q);
 
-    if (!user) {
-      alert("No matching account found. Check your credentials or sign up.");
-      return;
+      if (snap.empty) {
+        alert(
+          "No matching account found. Check your credentials or sign up."
+        );
+        return;
+      }
+
+      const docSnap = snap.docs[0];
+      const data = docSnap.data();
+      const user = {
+        id: data.id ?? Number(docSnap.id),
+        ...data,
+      };
+
+      setCurrentUser(user);
+
+      // Update local user cache (merge/update)
+      const users = loadUsers();
+      const idx = users.findIndex((u) => u.id == user.id);
+      if (idx === -1) {
+        users.push(user);
+      } else {
+        users[idx] = user;
+      }
+      saveUsers(users);
+
+      updateAuthUI();
+
+      const loginModalEl = document.getElementById("loginModal");
+      if (loginModalEl && typeof bootstrap !== "undefined") {
+        const modalInstance =
+          bootstrap.Modal.getInstance(loginModalEl) ||
+          new bootstrap.Modal(loginModalEl);
+        modalInstance.hide();
+      }
+
+      loginForm.reset();
+    } catch (err) {
+      console.error("Error logging in:", err);
+      alert("There was an error during login. Please try again.");
     }
-
-    setCurrentUser(user);
-    updateAuthUI();
-
-    const loginModalEl = document.getElementById("loginModal");
-    if (loginModalEl && typeof bootstrap !== "undefined") {
-      const modalInstance =
-        bootstrap.Modal.getInstance(loginModalEl) ||
-        new bootstrap.Modal(loginModalEl);
-      modalInstance.hide();
-    }
-
-    loginForm.reset();
   });
 }
 
 // ===========================
-//  LIKE BUTTON TOGGLE
+//  LIKE BUTTON TOGGLE (with Firestore update)
 // ===========================
-document.addEventListener("click", function (e) {
+document.addEventListener("click", async function (e) {
   const btn = e.target.closest(".like-btn");
   if (!btn) return;
 
@@ -1042,16 +1186,23 @@ document.addEventListener("click", function (e) {
     if (index !== -1) {
       posts[index].likes = count;
       savePosts(posts);
-      renderPopularTopics();   // likes affect topic rankings
-      renderPeopleToFollow();  // likes affect people suggestions
+      renderPopularTopics();
+      renderPeopleToFollow();
+
+      // Firestore update
+      try {
+        await updateDoc(doc(postsCol, String(postId)), { likes: count });
+      } catch (err) {
+        console.error("Error updating likes in Firestore:", err);
+      }
     }
   }
 });
 
 // ===========================
-//  FOLLOW / UNFOLLOW BUTTONS
+//  FOLLOW / UNFOLLOW BUTTONS (Firestore)
 // ===========================
-document.addEventListener("click", function (e) {
+document.addEventListener("click", async function (e) {
   const btn = e.target.closest("[data-follow-user-id]");
   if (!btn) return;
 
@@ -1072,13 +1223,30 @@ document.addEventListener("click", function (e) {
   const targetId = Number(btn.getAttribute("data-follow-user-id"));
   if (!targetId || targetId === current.id) return;
 
-  const nowFollowing = toggleFollow(current.id, targetId);
+  // Local toggle
+  const nowFollowing = toggleFollowLocal(current.id, targetId);
 
   btn.textContent = nowFollowing ? "Following" : "Follow";
   btn.classList.toggle("btn-main", nowFollowing);
   btn.classList.toggle("btn-outline-soft", !nowFollowing);
 
-  // Refresh suggestions so people you follow can drop out if needed
+  // Firestore write
+  const followDocId = `${current.id}_${targetId}`;
+  try {
+    if (nowFollowing) {
+      await setDoc(doc(followsCol, followDocId), {
+        followerId: current.id,
+        targetId,
+        createdAt: Date.now(),
+      });
+    } else {
+      await deleteDoc(doc(followsCol, followDocId));
+    }
+  } catch (err) {
+    console.error("Error updating follow in Firestore:", err);
+  }
+
+  // Refresh suggestions
   renderPeopleToFollow();
 });
 
@@ -1108,9 +1276,9 @@ document.addEventListener("click", function (e) {
 });
 
 // ===========================
-//  COMMENT FORM SUBMIT
+//  COMMENT FORM SUBMIT (Firestore)
 // ===========================
-document.addEventListener("submit", function (e) {
+document.addEventListener("submit", async function (e) {
   const form = e.target.closest(".comment-form");
   if (!form) return;
 
@@ -1140,8 +1308,9 @@ document.addEventListener("submit", function (e) {
   const text = input.value.trim();
   if (!text) return;
 
+  const commentId = Date.now();
   const comment = {
-    id: Date.now(),
+    id: commentId,
     postId,
     userId: user.id,
     username: user.username,
@@ -1150,8 +1319,16 @@ document.addEventListener("submit", function (e) {
     createdAt: Date.now(),
   };
 
-  addCommentToPost(postId, comment);
+  // Local cache
+  addCommentToLocal(postId, comment);
   input.value = "";
+
+  // Firestore
+  try {
+    await setDoc(doc(commentsCol, String(commentId)), comment);
+  } catch (err) {
+    console.error("Error writing comment to Firestore:", err);
+  }
 
   const commentsSection = article.querySelector(".post-comments");
   if (commentsSection) {
@@ -1170,7 +1347,6 @@ document.addEventListener("submit", function (e) {
 //  TOPIC PILL FILTER + CLEAR
 // ===========================
 document.addEventListener("click", function (e) {
-  // Clear filter button
   const clearBtn = e.target.closest("#clearFilterBtn");
   if (clearBtn) {
     activeTopic = null;
@@ -1187,7 +1363,6 @@ document.addEventListener("click", function (e) {
     return;
   }
 
-  // Topic pill
   const pill = e.target.closest(".tag-pill[data-topic]");
   if (!pill) return;
 

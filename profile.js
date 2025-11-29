@@ -1,4 +1,39 @@
 // ===========================
+//  FIREBASE APP + FIRESTORE
+// ===========================
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+import {
+  getFirestore,
+  collection,
+  doc,
+  getDocs,
+  setDoc,
+  updateDoc,
+  deleteDoc,
+  query,
+  orderBy,
+} from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+
+// 🔹 Same config as index.js
+const firebaseConfig = {
+  apiKey: "AIzaSyCx_ChAZXvx1CX-GBNbgiv1znL95z8JCJo",
+  authDomain: "openwall-b9fc7.firebaseapp.com",
+  projectId: "openwall-b9fc7",
+  storageBucket: "openwall-b9fc7.appspot.com",
+  messagingSenderId: "584620300362",
+  appId: "1:584620300362:web:c313bcc2c982b638a16eb3",
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+// Firestore collections
+const usersCol = collection(db, "users");
+const postsCol = collection(db, "posts");
+const commentsCol = collection(db, "comments");
+const followsCol = collection(db, "follows");
+
+// ===========================
 //  YEAR IN FOOTER
 // ===========================
 const yearEl = document.getElementById("year");
@@ -50,7 +85,7 @@ const POSTS_KEY = "openwall-posts";
 const COMMENTS_KEY = "openwall-comments"; // shared with index.js
 const CURRENT_USER_KEY = "openwall-current";
 
-// Follows: followerId -> [followedUserId, ...]
+// Follows: followerId -> [followedUserId, ...] (local cache)
 const FOLLOWS_KEY = "openwall-follows";
 
 function loadFollows() {
@@ -91,7 +126,7 @@ function isFollowing(followerId, targetId) {
   return following.includes(targetId);
 }
 
-function toggleFollow(followerId, targetId) {
+function toggleFollowLocal(followerId, targetId) {
   if (!followerId || !targetId || followerId === targetId) return false;
 
   const map = loadFollows();
@@ -189,7 +224,7 @@ function getCommentsForPost(postId) {
   return map[String(postId)] || [];
 }
 
-function addCommentToPost(postId, comment) {
+function addCommentToLocal(postId, comment) {
   const map = loadCommentsMap();
   const key = String(postId);
   if (!map[key]) {
@@ -261,6 +296,73 @@ function showToastError(message) {
 }
 
 // ===========================
+//  FIRESTORE SYNC HELPERS
+// ===========================
+async function syncUsersFromFirestore() {
+  const snap = await getDocs(usersCol);
+  let users = [];
+
+  if (snap.empty) {
+    // If you seeded demo users from index.js, they'll get written there.
+    return;
+  }
+
+  users = snap.docs.map((d) => {
+    const data = d.data();
+    return {
+      id: data.id ?? Number(d.id),
+      ...data,
+    };
+  });
+
+  saveUsers(users);
+}
+
+async function syncPostsFromFirestore() {
+  const snap = await getDocs(query(postsCol, orderBy("createdAt", "desc")));
+  if (snap.empty) {
+    return;
+  }
+
+  const posts = snap.docs.map((d) => {
+    const data = d.data();
+    return {
+      id: data.id ?? Number(d.id),
+      ...data,
+    };
+  });
+
+  savePosts(posts);
+}
+
+async function syncCommentsFromFirestore() {
+  const snap = await getDocs(commentsCol);
+  const map = {};
+  snap.forEach((d) => {
+    const c = d.data();
+    const key = String(c.postId);
+    if (!map[key]) map[key] = [];
+    map[key].push(c);
+  });
+  saveCommentsMap(map);
+}
+
+async function syncFollowsFromFirestore() {
+  const snap = await getDocs(followsCol);
+  const map = {};
+  snap.forEach((d) => {
+    const f = d.data();
+    const followerId = String(f.followerId);
+    const targetId = f.targetId;
+    if (!map[followerId]) map[followerId] = [];
+    if (!map[followerId].includes(targetId)) {
+      map[followerId].push(targetId);
+    }
+  });
+  saveFollows(map);
+}
+
+// ===========================
 //  PROFILE DATA HELPERS
 // ===========================
 function getProfileUser() {
@@ -288,13 +390,8 @@ function getProfileUser() {
 
 function getAvatarUrlForUser(user) {
   if (!user) return null;
-
-  // Prefer new format
   if (user.avatarDataUrl) return user.avatarDataUrl;
-
-  // Fallback: support old or mismatched saves
   if (user.avatar) return user.avatar;
-
   return null;
 }
 
@@ -554,10 +651,8 @@ function renderProfilePosts(user, isOwnProfile) {
 
   const visiblePosts = allPosts.filter((p) => {
     if (isOwnProfile) {
-      // On your own profile: your posts + posts from people you follow
       return p.userId === user.id || followingIds.includes(p.userId);
     }
-    // On someone else's profile: only this user's posts
     return p.userId === user.id;
   });
 
@@ -735,7 +830,7 @@ function setupEditProfileForm(user, isOwnProfile) {
     };
   }
 
-  form.onsubmit = function (e) {
+  form.onsubmit = async function (e) {
     e.preventDefault();
 
     try {
@@ -759,7 +854,21 @@ function setupEditProfileForm(user, isOwnProfile) {
         updatedUser.avatarDataUrl = pendingAvatarDataUrl;
       }
 
-      // Save users
+      // 🔹 Update Firestore user doc
+      await updateDoc(doc(usersCol, String(updatedUser.id)), {
+        name: updatedUser.name,
+        username: updatedUser.username,
+        location: updatedUser.location || "",
+        website: updatedUser.website || "",
+        bio: updatedUser.bio || "",
+        avatarDataUrl: updatedUser.avatarDataUrl || null,
+      }).catch(async (err) => {
+        // if doc doesn't exist yet (old local user), create it
+        console.warn("updateDoc failed, trying setDoc", err);
+        await setDoc(doc(usersCol, String(updatedUser.id)), updatedUser);
+      });
+
+      // Save locally
       users[idx] = updatedUser;
       saveUsers(users);
 
@@ -768,7 +877,7 @@ function setupEditProfileForm(user, isOwnProfile) {
         setCurrentUser(updatedUser);
       }
 
-      // Update posts to reflect new name/username
+      // Update posts to reflect new name/username in local cache
       const posts = loadPosts();
       let changed = false;
       posts.forEach((p) => {
@@ -782,14 +891,13 @@ function setupEditProfileForm(user, isOwnProfile) {
         savePosts(posts);
       }
 
-      // Re-render profile sections 
-        renderProfileHeader(updatedUser, true);
-        renderProfileAbout(updatedUser);
-        renderProfileTopics(updatedUser);
-        renderProfilePosts(updatedUser, true);
+      // Re-render profile sections
+      renderProfileHeader(updatedUser, true);
+      renderProfileAbout(updatedUser);
+      renderProfileTopics(updatedUser);
+      renderProfilePosts(updatedUser, true);
 
-        showToastSuccess("Profile updated successfully!");
-
+      showToastSuccess("Profile updated successfully!");
     } catch (err) {
       console.error(err);
       showToastError("Something went wrong. Please try again.");
@@ -814,12 +922,11 @@ function renderProfile() {
   const currentUser = getCurrentUser();
   const isOwnProfile = currentUser && currentUser.id === profileUser.id;
 
-    renderProfileHeader(profileUser, isOwnProfile);
-    renderProfileAbout(profileUser);
-    renderProfileTopics(profileUser);
-    renderProfilePosts(profileUser, isOwnProfile);
-    setupEditProfileForm(profileUser, isOwnProfile);
-
+  renderProfileHeader(profileUser, isOwnProfile);
+  renderProfileAbout(profileUser);
+  renderProfileTopics(profileUser);
+  renderProfilePosts(profileUser, isOwnProfile);
+  setupEditProfileForm(profileUser, isOwnProfile);
 }
 
 // ===========================
@@ -827,7 +934,7 @@ function renderProfile() {
 // ===========================
 
 // Like toggle (profile posts)
-document.addEventListener("click", function (e) {
+document.addEventListener("click", async function (e) {
   const btn = e.target.closest(".like-btn");
   if (!btn) return;
 
@@ -858,6 +965,13 @@ document.addEventListener("click", function (e) {
   if (index !== -1) {
     posts[index].likes = count;
     savePosts(posts);
+  }
+
+  // 🔹 Update Firestore likes
+  try {
+    await updateDoc(doc(postsCol, String(postId)), { likes: count });
+  } catch (err) {
+    console.error("Error updating likes in Firestore:", err);
   }
 
   const profileUser = getProfileUser();
@@ -891,7 +1005,7 @@ document.addEventListener("click", function (e) {
 });
 
 // Comment submit
-document.addEventListener("submit", function (e) {
+document.addEventListener("submit", async function (e) {
   const form = e.target.closest(".comment-form");
   if (!form) return;
   if (!form.closest("#profilePosts")) return;
@@ -900,7 +1014,6 @@ document.addEventListener("submit", function (e) {
 
   const user = getCurrentUser();
   if (!user) {
-    // On this page we don't have the login modal, so just alert.
     alert("Log in to add a comment.");
     return;
   }
@@ -915,8 +1028,9 @@ document.addEventListener("submit", function (e) {
   const text = input.value.trim();
   if (!text) return;
 
+  const commentId = Date.now();
   const comment = {
-    id: Date.now(),
+    id: commentId,
     postId,
     userId: user.id,
     username: user.username,
@@ -925,8 +1039,16 @@ document.addEventListener("submit", function (e) {
     createdAt: Date.now(),
   };
 
-  addCommentToPost(postId, comment);
+  // Local
+  addCommentToLocal(postId, comment);
   input.value = "";
+
+  // 🔹 Firestore
+  try {
+    await setDoc(doc(commentsCol, String(commentId)), comment);
+  } catch (err) {
+    console.error("Error writing comment to Firestore:", err);
+  }
 
   const commentsSection = article.querySelector(".post-comments");
   if (commentsSection) {
@@ -944,7 +1066,7 @@ document.addEventListener("submit", function (e) {
 // ===========================
 //  FOLLOW / UNFOLLOW ON PROFILE
 // ===========================
-document.addEventListener("click", function (e) {
+document.addEventListener("click", async function (e) {
   const btn = e.target.closest("[data-follow-target-id]");
   if (!btn) return;
 
@@ -957,16 +1079,33 @@ document.addEventListener("click", function (e) {
   const targetId = Number(btn.getAttribute("data-follow-target-id"));
   if (!targetId || targetId === current.id) return;
 
-  const nowFollowing = toggleFollow(current.id, targetId);
+  const nowFollowing = toggleFollowLocal(current.id, targetId);
 
   btn.textContent = nowFollowing ? "Following" : "Follow";
   btn.classList.toggle("btn-main", nowFollowing);
   btn.classList.toggle("btn-outline-soft", !nowFollowing);
 
-  // Re-render header + posts so counts and wall update
   const profileUser = getProfileUser();
+  const isOwnProfile = profileUser && profileUser.id === current.id;
+
+  // 🔹 Firestore follows
+  const followDocId = `${current.id}_${targetId}`;
+  try {
+    if (nowFollowing) {
+      await setDoc(doc(followsCol, followDocId), {
+        followerId: current.id,
+        targetId,
+        createdAt: Date.now(),
+      });
+    } else {
+      await deleteDoc(doc(followsCol, followDocId));
+    }
+  } catch (err) {
+    console.error("Error updating follow in Firestore:", err);
+  }
+
+  // Re-render header + posts so counts and wall update
   if (profileUser) {
-    const isOwnProfile = current.id === profileUser.id;
     renderProfileHeader(profileUser, isOwnProfile);
     renderProfilePosts(profileUser, isOwnProfile);
   }
@@ -975,7 +1114,19 @@ document.addEventListener("click", function (e) {
 // ===========================
 //  INIT
 // ===========================
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   initToasts();
+
+  try {
+    await Promise.all([
+      syncUsersFromFirestore(),
+      syncPostsFromFirestore(),
+      syncCommentsFromFirestore(),
+      syncFollowsFromFirestore(),
+    ]);
+  } catch (err) {
+    console.error("Error syncing profile data from Firestore:", err);
+  }
+
   renderProfile();
 });

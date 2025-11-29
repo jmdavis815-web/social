@@ -14,7 +14,6 @@
     integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
     crossorigin="anonymous"
   >
-
 </head>
 <body>
   <!-- NAVBAR -->
@@ -46,7 +45,7 @@
             type="button"
             aria-label="Switch to dark mode"
           >
-              🌓
+            🌓
           </button>
 
           <!-- LOGIN / SIGNUP BUTTONS -->
@@ -68,7 +67,6 @@
             Create account
           </button>
         </div>
-
       </div>
     </div>
   </nav>
@@ -112,9 +110,9 @@
 
     <!-- MAIN FEED LAYOUT -->
     <main class="feed-layout">
-            <!-- FEED COLUMN -->
+      <!-- FEED COLUMN -->
       <section aria-label="Main feed">
-        <!-- Composer (for logged-in users later) -->
+        <!-- Composer -->
         <div class="composer-card">
           <div class="d-flex align-items-start gap-2">
             <div class="composer-avatar">M</div>
@@ -152,9 +150,9 @@
         <div class="sidebar-card">
           <div class="sidebar-title">Popular topics</div>
           <div class="mb-2" id="popularTopics"></div>
-            <small class="text-body-secondary">
-              Click a topic to filter the wall by hashtag. Topics with the most likes float to the top.
-            </small>
+          <small class="text-body-secondary">
+            Click a topic to filter the wall by hashtag. Topics with the most likes float to the top.
+          </small>
         </div>
 
         <div class="sidebar-card">
@@ -162,12 +160,6 @@
           <div id="peopleToFollow"></div>
           <small class="text-body-secondary d-block mt-2">
             Suggestions are based on users whose posts receive the most likes.
-          </small>
-        </div>
-
-
-          <small class="text-body-secondary">
-            Once your auth and database are live, these buttons can call your backend to connect users.
           </small>
         </div>
 
@@ -188,105 +180,104 @@
     </footer>
   </div>
 
-    <!-- LOGIN MODAL -->
-<div class="modal fade" id="loginModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content" style="background-color: var(--card-bg); color: var(--text-main); border-radius: 1rem; border: 1px solid var(--card-border);">
-      <div class="modal-header border-0">
-        <h5 class="modal-title">Log in</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body">
-        <form id="loginForm">
-          <div class="mb-3">
-            <label class="form-label" for="loginEmail">Email</label>
-            <input id="loginEmail" type="email" class="form-control" placeholder="you@example.com" required>
-          </div>
-          <div class="mb-3">
-            <label class="form-label" for="loginPassword">Password</label>
-            <input id="loginPassword" type="password" class="form-control" placeholder="••••••••" required>
-          </div>
-          <button type="submit" class="btn btn-main w-100">
-            Log in
+  <!-- LOGIN MODAL -->
+  <div class="modal fade" id="loginModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content" style="background-color: var(--card-bg); color: var(--text-main); border-radius: 1rem; border: 1px solid var(--card-border);">
+        <div class="modal-header border-0">
+          <h5 class="modal-title">Log in</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <form id="loginForm">
+            <div class="mb-3">
+              <label class="form-label" for="loginEmail">Email</label>
+              <input id="loginEmail" type="email" class="form-control" placeholder="you@example.com" required>
+            </div>
+            <div class="mb-3">
+              <label class="form-label" for="loginPassword">Password</label>
+              <input id="loginPassword" type="password" class="form-control" placeholder="••••••••" required>
+            </div>
+            <button type="submit" class="btn btn-main w-100">
+              Log in
+            </button>
+          </form>
+        </div>
+        <div class="modal-footer border-0 justify-content-between">
+          <small class="text-body-secondary">
+            Don’t have an account?
+          </small>
+          <button
+            type="button"
+            class="btn btn-outline-soft btn-sm"
+            data-bs-dismiss="modal"
+            data-bs-toggle="modal"
+            data-bs-target="#signupModal"
+          >
+            Create one
           </button>
-        </form>
-      </div>
-      <div class="modal-footer border-0 justify-content-between">
-        <small class="text-body-secondary">
-          Don’t have an account?
-        </small>
-        <button
-          type="button"
-          class="btn btn-outline-soft btn-sm"
-          data-bs-dismiss="modal"
-          data-bs-toggle="modal"
-          data-bs-target="#signupModal"
-        >
-          Create one
-        </button>
+        </div>
       </div>
     </div>
   </div>
-</div>
 
   <!-- SIGNUP MODAL -->
-<div class="modal fade" id="signupModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content" style="background-color: var(--card-bg); color: var(--text-main); border-radius: 1rem; border: 1px solid var(--card-border);">
-      <div class="modal-header border-0">
-        <h5 class="modal-title">Create your account</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body">
-        <!-- IMPORTANT: this id must match the JS -->
-        <form id="signupForm">
-          <div class="mb-3">
-            <label class="form-label" for="signupName">Name</label>
-            <input id="signupName" type="text" class="form-control" placeholder="Your name" required>
-          </div>
-          <div class="mb-3">
-            <label class="form-label" for="signupUsername">Username</label>
-            <input id="signupUsername" type="text" class="form-control" placeholder="@username" required>
-          </div>
-          <div class="mb-3">
-            <label class="form-label" for="signupEmail">Email</label>
-            <input id="signupEmail" type="email" class="form-control" placeholder="you@example.com" required>
-          </div>
-          <div class="mb-3">
-            <label class="form-label" for="signupPassword">Password</label>
-            <input id="signupPassword" type="password" class="form-control" placeholder="Create a password" required>
-          </div>
-          <button type="submit" class="btn btn-main w-100">
-            Create account
+  <div class="modal fade" id="signupModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content" style="background-color: var(--card-bg); color: var(--text-main); border-radius: 1rem; border: 1px solid var(--card-border);">
+        <div class="modal-header border-0">
+          <h5 class="modal-title">Create your account</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <form id="signupForm">
+            <div class="mb-3">
+              <label class="form-label" for="signupName">Name</label>
+              <input id="signupName" type="text" class="form-control" placeholder="Your name" required>
+            </div>
+            <div class="mb-3">
+              <label class="form-label" for="signupUsername">Username</label>
+              <input id="signupUsername" type="text" class="form-control" placeholder="@username" required>
+            </div>
+            <div class="mb-3">
+              <label class="form-label" for="signupEmail">Email</label>
+              <input id="signupEmail" type="email" class="form-control" placeholder="you@example.com" required>
+            </div>
+            <div class="mb-3">
+              <label class="form-label" for="signupPassword">Password</label>
+              <input id="signupPassword" type="password" class="form-control" placeholder="Create a password" required>
+            </div>
+            <button type="submit" class="btn btn-main w-100">
+              Create account
+            </button>
+          </form>
+        </div>
+        <div class="modal-footer border-0 justify-content-between">
+          <small class="text-body-secondary">
+            Already have an account?
+          </small>
+          <button
+            type="button"
+            class="btn btn-outline-soft btn-sm"
+            data-bs-dismiss="modal"
+            data-bs-toggle="modal"
+            data-bs-target="#loginModal"
+          >
+            Log in
           </button>
-        </form>
-      </div>
-      <div class="modal-footer border-0 justify-content-between">
-        <small class="text-body-secondary">
-          Already have an account?
-        </small>
-        <button
-          type="button"
-          class="btn btn-outline-soft btn-sm"
-          data-bs-dismiss="modal"
-          data-bs-toggle="modal"
-          data-bs-target="#loginModal"
-        >
-          Log in
-        </button>
+        </div>
       </div>
     </div>
   </div>
-</div>
 
   <!-- Bootstrap JS -->
   <script
-  src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"
-  integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI"
-  crossorigin="anonymous">
-</script>
+    src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"
+    integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI"
+    crossorigin="anonymous">
+  </script>
 
-  <script src="index.js"></script>
-
+  <!-- IMPORTANT: Firestore code uses ES modules -->
+  <script type="module" src="index.js"></script>
 </body>
 </html>
