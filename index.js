@@ -345,9 +345,6 @@ function renderPopularTopics() {
 // ===========================
 //  USER LIKE STATS & PEOPLE TO FOLLOW
 // ===========================
-// ===========================
-//  USER LIKE STATS & PEOPLE TO FOLLOW
-// ===========================
 function computeUserLikeStats() {
   const posts = loadPosts();
   const users = loadUsers();
@@ -372,22 +369,21 @@ function computeUserLikeStats() {
 
   // Map to include user details
   const result = Object.values(stats)
-  .map((entry) => {
-    const user = users.find((u) => u.id === entry.userId) || {};
-    return {
-      ...entry,
-      name: user.name || "Unknown",
-      username: user.username || "user",
-      avatarUrl: user.avatarDataUrl || null,
-    };
-  })
-  .sort((a, b) => {
-    // Sort by likes desc, then postCount desc
-    if (b.totalLikes !== a.totalLikes) {
-      return b.totalLikes - a.totalLikes;
-    }
-    return b.postCount - a.postCount;
-  });
+    .map((entry) => {
+      const user = users.find((u) => u.id === entry.userId) || {};
+      return {
+        ...entry,
+        name: user.name || "Unknown",
+        username: user.username || "user",
+        avatarUrl: user.avatarDataUrl || null, // ✅ use profile picture
+      };
+    })
+    .sort((a, b) => {
+      if (b.totalLikes !== a.totalLikes) {
+        return b.totalLikes - a.totalLikes;
+      }
+      return b.postCount - a.postCount;
+    });
 
   return result;
 }
@@ -416,67 +412,56 @@ function renderPeopleToFollow() {
   }
 
   // Show top 3
+  const topUsers = filtered.slice(0, 3);
+
   topUsers.forEach((u) => {
-  const row = document.createElement("div");
-  row.className =
-    "d-flex align-items-center justify-content-between mb-2";
+    const row = document.createElement("div");
+    row.className =
+      "d-flex align-items-center justify-content-between mb-2";
 
-  const initials =
-    (u.name || "")
-      .split(" ")
-      .filter(Boolean)
-      .map((n) => n[0])
-      .join("")
-      .slice(0, 2)
-      .toUpperCase() || "U";
+    const initials =
+      (u.name || "")
+        .split(" ")
+        .filter(Boolean)
+        .map((n) => n[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase() || "U";
 
-  const avatarHtml = u.avatarUrl
-    ? `
-      <div class="mini-avatar">
-        <img
-          src="${escapeHtml(u.avatarUrl)}"
-          alt="${escapeHtml(initials)}"
-          class="post-avatar-img"
-        />
-      </div>
-    `
-    : `<div class="mini-avatar">${escapeHtml(initials)}</div>`;
-
-  const isUserFollowing =
-    currentUser && isFollowing(currentUser.id, u.userId);
-
-  const btnLabel = isUserFollowing ? "Following" : "Follow";
-  const btnClasses = isUserFollowing
-    ? "btn btn-main btn-sm px-2 py-1"
-    : "btn btn-outline-soft btn-sm px-2 py-1";
-
-  row.innerHTML = `
-    <a
-      href="profile.html?userId=${u.userId}"
-      class="d-flex align-items-center text-reset text-decoration-none"
-    >
-      ${avatarHtml}
-      <div>
-        <div class="fw-semibold" style="font-size: 0.86rem;">
-          ${escapeHtml(u.name)}
+    const avatarHtml = u.avatarUrl
+      ? `
+        <div class="mini-avatar">
+          <img
+            src="${escapeHtml(u.avatarUrl)}"
+            alt="${escapeHtml(initials)}"
+            class="post-avatar-img"
+          />
         </div>
-        <div class="text-body-secondary" style="font-size: 0.78rem;">
-          @${escapeHtml(u.username)} · ${u.totalLikes}♥
+      `
+      : `<div class="mini-avatar">${escapeHtml(initials)}</div>`;
+
+    row.innerHTML = `
+      <a
+        href="profile.html?userId=${u.userId}"
+        class="d-flex align-items-center text-reset text-decoration-none"
+      >
+        ${avatarHtml}
+        <div>
+          <div class="fw-semibold" style="font-size: 0.86rem;">
+            ${escapeHtml(u.name)}
+          </div>
+          <div class="text-body-secondary" style="font-size: 0.78rem;">
+            @${escapeHtml(u.username)} · ${u.totalLikes}♥
+          </div>
         </div>
-      </div>
-    </a>
-    <button
-      class="${btnClasses}"
-      type="button"
-      data-follow-user-id="${u.userId}"
-    >
-      ${btnLabel}
-    </button>
-  `;
+      </a>
+      <button class="btn btn-outline-soft btn-sm px-2 py-1" disabled>
+        Follow
+      </button>
+    `;
 
-  container.appendChild(row);
-});
-
+    container.appendChild(row);
+  });
 }
 
 // ===========================
