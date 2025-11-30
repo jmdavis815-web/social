@@ -415,4 +415,13 @@
   border-radius: 50%; /* secondary safety */
 }
 
+/* Comment images */
+.comment-image {
+  display: block;
+  max-width: 100%;
+  border-radius: 0.6rem;
+  margin-top: 0.35rem;
+  border: 1px solid var(--card-border);
+}
+
 

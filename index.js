@@ -536,31 +536,44 @@ function renderCommentsForPost(postId, commentsSection) {
   }
 
   comments
-    .slice()
-    .sort((a, b) => a.createdAt - b.createdAt)
-    .forEach((c) => {
-      const item = document.createElement("div");
-      item.className = "comment-item small";
+  .slice()
+  .sort((a, b) => a.createdAt - b.createdAt)
+  .forEach((c) => {
+    const item = document.createElement("div");
+    item.className = "comment-item small";
 
-      const when = timeAgo(c.createdAt || Date.now());
+    const when = timeAgo(c.createdAt || Date.now());
 
-      item.innerHTML = `
-        <div class="d-flex justify-content-between">
-          <div>
-            <strong>${escapeHtml(c.name || "Unknown")}</strong>
-            <span class="text-body-secondary ms-1">@${escapeHtml(
-              c.username || "user"
-            )}</span>
-          </div>
-          <span class="text-body-secondary">${when}</span>
+    const imageHtml = c.imageDataUrl
+      ? `
+        <div class="mt-1">
+          <img
+            src="${escapeHtml(c.imageDataUrl)}"
+            alt="Comment image"
+            class="comment-image"
+          />
         </div>
-        <div class="comment-body">
-          ${escapeHtml(c.body || "")}
-        </div>
-      `;
+      `
+      : "";
 
-      listEl.appendChild(item);
-    });
+    item.innerHTML = `
+      <div class="d-flex justify-content-between">
+        <div>
+          <strong>${escapeHtml(c.name || "Unknown")}</strong>
+          <span class="text-body-secondary ms-1">@${escapeHtml(
+            c.username || "user"
+          )}</span>
+        </div>
+        <span class="text-body-secondary">${when}</span>
+      </div>
+      <div class="comment-body">
+        ${escapeHtml(c.body || "")}
+      </div>
+      ${imageHtml}
+    `;
+
+    listEl.appendChild(item);
+  });
 }
 
 // ===========================
@@ -670,17 +683,23 @@ function renderPosts() {
 
           <div class="post-comments mt-2" data-comments-for="${post.id}" hidden>
             <div class="comment-list mb-2"></div>
-
-            <form class="comment-form d-flex gap-2">
-              <input
-                type="text"
-                class="form-control form-control-sm comment-input"
-                placeholder="Write a comment…"
-              />
-              <button type="submit" class="btn btn-outline-soft btn-sm">
-                Comment
-              </button>
-            </form>
+              <form class="comment-form">
+                <div class="d-flex gap-2 mb-1">
+                  <input
+                    type="text"
+                    class="form-control form-control-sm comment-input"
+                    placeholder="Write a comment…"
+                  />
+                  <button type="submit" class="btn btn-outline-soft btn-sm">
+                    Comment
+                  </button>
+                  </div>
+                  <input
+                    type="file"
+                    class="form-control form-control-sm comment-image-input"
+                    accept="image/*"
+                  />
+                </form>
           </div>
         </div>
       </div>
@@ -1303,10 +1322,29 @@ document.addEventListener("submit", async function (e) {
 
   const postId = Number(article.dataset.postId);
   const input = form.querySelector(".comment-input");
+  const fileInput = form.querySelector(".comment-image-input");
+
   if (!input) return;
 
   const text = input.value.trim();
-  if (!text) return;
+  let imageDataUrl = null;
+
+  // Read image if one is selected
+  if (fileInput && fileInput.files && fileInput.files[0]) {
+    const file = fileInput.files[0];
+    imageDataUrl = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (event) => resolve(event.target.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    }).catch((err) => {
+      console.error("Error reading comment image:", err);
+      return null;
+    });
+  }
+
+  // Don't post empty: must be text or image
+  if (!text && !imageDataUrl) return;
 
   const commentId = Date.now();
   const comment = {
@@ -1316,12 +1354,16 @@ document.addEventListener("submit", async function (e) {
     username: user.username,
     name: user.name,
     body: text,
+    imageDataUrl: imageDataUrl || null,
     createdAt: Date.now(),
   };
 
   // Local cache
   addCommentToLocal(postId, comment);
   input.value = "";
+  if (fileInput) {
+    fileInput.value = "";
+  }
 
   // Firestore
   try {
