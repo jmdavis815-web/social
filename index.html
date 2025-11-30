@@ -6,7 +6,12 @@
   <meta name="color-scheme" content="light dark">
   <title>OpenWall — Social Feed</title>
 
+  <!-- Tiny inline favicon so the browser stops 404-ing favicon.ico -->
+  <link rel="icon" href="data:,">
+
+  <!-- Main Styles -->
   <link rel="stylesheet" href="style.css">
+
   <!-- Bootstrap CSS -->
   <link
     href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css"
@@ -15,22 +20,32 @@
     crossorigin="anonymous"
   >
 </head>
+
 <body>
   <!-- NAVBAR -->
   <nav class="navbar navbar-expand-lg sticky-top">
     <div class="container-fluid px-3 px-md-4">
-      <a class="navbar-brand brand-glow" href="#">
+      <a class="navbar-brand brand-glow" href="index.html">
         Open<span>Wall</span>
       </a>
 
-      <button title="Main Menu" class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav">
+      <button
+        title="Main Menu"
+        class="navbar-toggler"
+        type="button"
+        data-bs-toggle="collapse"
+        data-bs-target="#mainNav"
+        aria-controls="mainNav"
+        aria-expanded="false"
+        aria-label="Toggle navigation"
+      >
         <span class="navbar-toggler-icon"></span>
       </button>
 
       <div class="collapse navbar-collapse" id="mainNav">
         <ul class="navbar-nav ms-3 me-auto mb-2 mb-lg-0">
           <li class="nav-item">
-            <a class="nav-link active" aria-current="page" href="#">Home</a>
+            <a class="nav-link active" aria-current="page" href="index.html">Home</a>
           </li>
           <li class="nav-item">
             <a class="nav-link" href="#">Explore</a>
@@ -48,17 +63,33 @@
             🌓
           </button>
 
-          <!-- LOGIN / SIGNUP BUTTONS -->
-          <!-- These show when logged OUT -->
-          <button id="loginNavBtn" class="btn btn-outline-soft btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#loginModal">
+          <!-- LOGIN / SIGNUP BUTTONS (shown when logged OUT) -->
+          <button
+            id="loginNavBtn"
+            class="btn btn-outline-soft btn-sm"
+            type="button"
+            data-bs-toggle="modal"
+            data-bs-target="#loginModal"
+          >
             Log in
           </button>
-          <button id="signupNavBtn" class="btn btn-main btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#signupModal">
+          <button
+            id="signupNavBtn"
+            class="btn btn-main btn-sm"
+            type="button"
+            data-bs-toggle="modal"
+            data-bs-target="#signupModal"
+          >
             Sign up
           </button>
 
-          <!-- This shows when logged IN -->
-          <button id="logoutBtn" class="btn btn-soft btn-sm" style="display:none;">
+          <!-- LOGOUT BUTTON (shown when logged IN by JS) -->
+          <button
+            id="logoutBtn"
+            class="btn btn-soft btn-sm"
+            type="button"
+            style="display:none;"
+          >
             Log out
           </button>
         </div>
@@ -68,6 +99,7 @@
 
   <!-- PAGE WRAPPER -->
   <div class="page-wrapper">
+
     <!-- HERO / INTRO -->
     <section class="hero">
       <div class="hero-card">
@@ -82,21 +114,46 @@
               Newest posts always appear at the top of the main wall.
             </p>
             <div class="d-flex flex-wrap gap-2">
-              <button class="btn btn-main btn-sm" data-bs-toggle="modal" data-bs-target="#signupModal">
+              <button
+                class="btn btn-main btn-sm"
+                type="button"
+                data-bs-toggle="modal"
+                data-bs-target="#signupModal"
+              >
                 Get started — it’s free
               </button>
-              <button class="btn btn-outline-soft btn-sm" data-bs-toggle="modal" data-bs-target="#loginModal">
-                Already have an account?
+              <button
+                class="btn btn-outline-soft btn-sm"
+                type="button"
+                data-bs-toggle="modal"
+                data-bs-target="#loginModal"
+              >
+                Log in
               </button>
             </div>
           </div>
-          <div class="col-md-4 text-md-end text-start mt-3 mt-md-0">
-            <small class="text-body-secondary d-block mb-2">
-              Live view:
-            </small>
-            <div class="badge rounded-pill px-3 py-2"
-                 style="background-color: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent);">
-              ● Main Wall · Newest posts first
+          <div class="col-md-4">
+            <div class="hero-side card border-0">
+              <div class="card-body">
+                <div class="small text-body-secondary mb-1">
+                  This prototype uses local storage + Firestore.
+                </div>
+                <ol class="small text-body-secondary mb-2 ps-3">
+                  <li>Create a demo account.</li>
+                  <li>Post to the main wall.</li>
+                  <li>Like and comment on posts.</li>
+                  <li>Explore topics and people.</li>
+                </ol>
+                <small class="text-body-secondary d-block">
+                  Live view:
+                </small>
+                <div
+                  class="badge rounded-pill px-3 py-2 mt-1"
+                  style="background-color: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent);"
+                >
+                  ● Main Wall · Newest posts first
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -115,14 +172,19 @@
               <input
                 type="text"
                 class="composer-input"
-                placeholder="Share what's on your mind, Michael…"
+                placeholder="Share what’s on your mind…"
                 disabled
               >
               <div class="d-flex justify-content-between align-items-center mt-2">
                 <small class="text-body-secondary composer-note">
                   Log in or create an account to start posting.
                 </small>
-                <button class="btn btn-main btn-sm" data-bs-toggle="modal" data-bs-target="#loginModal">
+                <button
+                  class="btn btn-main btn-sm"
+                  type="button"
+                  data-bs-toggle="modal"
+                  data-bs-target="#loginModal"
+                >
                   Log in to post
                 </button>
               </div>
@@ -133,7 +195,13 @@
         <!-- ACTIVE TOPIC FILTER BAR -->
         <div id="activeFilterBar" class="active-filter-bar" hidden>
           <span id="activeFilterLabel"></span>
-          <button id="clearFilterBtn" class="btn btn-outline-soft btn-sm ms-2">Clear</button>
+          <button
+            id="clearFilterBtn"
+            class="btn btn-outline-soft btn-sm ms-2"
+            type="button"
+          >
+            Clear
+          </button>
         </div>
 
         <!-- DYNAMIC FEED WILL GO HERE -->
@@ -142,26 +210,30 @@
 
       <!-- SIDEBAR COLUMN -->
       <aside aria-label="Sidebar">
+        <!-- Popular Topics -->
         <div class="sidebar-card">
           <div class="sidebar-title">Popular topics</div>
           <div class="mb-2" id="popularTopics"></div>
-          <small class="text-body-secondary">
-            Click a topic to filter the wall by hashtag. Topics with the most likes float to the top.
+          <small class="text-body-secondary d-block">
+            Click a topic to filter the wall by hashtag.
+            Topics with the most likes float to the top.
           </small>
         </div>
 
+        <!-- People to Follow -->
         <div class="sidebar-card">
           <div class="sidebar-title">People to follow</div>
           <div id="peopleToFollow"></div>
           <small class="text-body-secondary d-block mt-2">
-            Suggestions are based on users whose posts receive the most likes.
+            Suggestions are based on users whose posts collect likes.
           </small>
         </div>
 
+        <!-- “What’s next to build?” helper -->
         <div class="sidebar-card">
           <div class="sidebar-title">What’s next to build?</div>
           <ol class="mb-0 ps-3 text-body-secondary">
-            <li>Sign-up & login (auth system).</li>
+            <li>Sign-up &amp; login (auth system).</li>
             <li>Database for posts and users.</li>
             <li>API endpoints to load and create posts.</li>
             <li>Replace sample posts with live data.</li>
@@ -170,15 +242,23 @@
       </aside>
     </main>
 
-    <footer>
-      © <span id="year"></span> OpenWall · Main Wall Prototype
+    <!-- FOOTER -->
+    <footer class="page-footer py-3 mt-4 border-top small text-center">
+      <div class="container-fluid">
+        <span class="text-body-secondary">
+          © <span id="year"></span> OpenWall · Main Wall Prototype
+        </span>
+      </div>
     </footer>
   </div>
 
   <!-- LOGIN MODAL -->
   <div class="modal fade" id="loginModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
-      <div class="modal-content" style="background-color: var(--card-bg); color: var(--text-main); border-radius: 1rem; border: 1px solid var(--card-border);">
+      <div
+        class="modal-content"
+        style="background-color: var(--card-bg); border-radius: 1rem; border: 1px solid var(--card-border);"
+      >
         <div class="modal-header border-0">
           <h5 class="modal-title">Log in</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -187,11 +267,23 @@
           <form id="loginForm">
             <div class="mb-3">
               <label class="form-label" for="loginEmail">Email</label>
-              <input id="loginEmail" type="email" class="form-control" placeholder="you@example.com" required>
+              <input
+                id="loginEmail"
+                type="email"
+                class="form-control"
+                placeholder="you@example.com"
+                required
+              >
             </div>
             <div class="mb-3">
               <label class="form-label" for="loginPassword">Password</label>
-              <input id="loginPassword" type="password" class="form-control" placeholder="••••••••" required>
+              <input
+                id="loginPassword"
+                type="password"
+                class="form-control"
+                placeholder="••••••••"
+                required
+              >
             </div>
             <button type="submit" class="btn btn-main w-100">
               Log in
@@ -219,7 +311,10 @@
   <!-- SIGNUP MODAL -->
   <div class="modal fade" id="signupModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
-      <div class="modal-content" style="background-color: var(--card-bg); color: var(--text-main); border-radius: 1rem; border: 1px solid var(--card-border);">
+      <div
+        class="modal-content"
+        style="background-color: var(--card-bg); border-radius: 1rem; border: 1px solid var(--card-border);"
+      >
         <div class="modal-header border-0">
           <h5 class="modal-title">Create your account</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -228,19 +323,43 @@
           <form id="signupForm">
             <div class="mb-3">
               <label class="form-label" for="signupName">Name</label>
-              <input id="signupName" type="text" class="form-control" placeholder="Your name" required>
+              <input
+                id="signupName"
+                type="text"
+                class="form-control"
+                placeholder="Your name"
+                required
+              >
             </div>
             <div class="mb-3">
               <label class="form-label" for="signupUsername">Username</label>
-              <input id="signupUsername" type="text" class="form-control" placeholder="@username" required>
+              <input
+                id="signupUsername"
+                type="text"
+                class="form-control"
+                placeholder="@username"
+                required
+              >
             </div>
             <div class="mb-3">
               <label class="form-label" for="signupEmail">Email</label>
-              <input id="signupEmail" type="email" class="form-control" placeholder="you@example.com" required>
+              <input
+                id="signupEmail"
+                type="email"
+                class="form-control"
+                placeholder="you@example.com"
+                required
+              >
             </div>
             <div class="mb-3">
               <label class="form-label" for="signupPassword">Password</label>
-              <input id="signupPassword" type="password" class="form-control" placeholder="Create a password" required>
+              <input
+                id="signupPassword"
+                type="password"
+                class="form-control"
+                placeholder="Create a password"
+                required
+              >
             </div>
             <button type="submit" class="btn btn-main w-100">
               Create account
@@ -269,10 +388,10 @@
   <script
     src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"
     integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI"
-    crossorigin="anonymous">
-  </script>
+    crossorigin="anonymous"
+  ></script>
 
-  <!-- IMPORTANT: Firestore code uses ES modules -->
+  <!-- IMPORTANT: Firestore + app logic (ES modules) -->
   <script type="module" src="index.js"></script>
 </body>
 </html>
