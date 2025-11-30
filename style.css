@@ -424,4 +424,17 @@
   border: 1px solid var(--card-border);
 }
 
+/* Comment images */
+.comment-image {
+  display: block;
+  max-width: 300px;     /* limit width */
+  max-height: 300px;    /* limit height */
+  width: auto;
+  height: auto;
+  border-radius: 0.6rem;
+  margin-top: 0.35rem;
+  border: 1px solid var(--card-border);
+}
+
+
 
