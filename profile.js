@@ -229,6 +229,16 @@ async function resizeImageTo300px(file) {
   });
 }
 
+// Just read an image file as a data URL (no resize)
+async function readImageAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => resolve(e.target.result);
+    reader.onerror = (err) => reject(err);
+    reader.readAsDataURL(file);
+  });
+}
+
 function loadUsers() {
   try {
     return JSON.parse(localStorage.getItem(USERS_KEY)) || [];
@@ -658,15 +668,15 @@ function renderCommentsForPost(postId, commentsSection) {
   }
 
   comments
-  .slice()
-  .sort((a, b) => a.createdAt - b.createdAt)
-  .forEach((c) => {
-    const item = document.createElement("div");
-    item.className = "comment-item small";
-    const when = timeAgo(c.createdAt || Date.now());
+    .slice()
+    .sort((a, b) => a.createdAt - b.createdAt)
+    .forEach((c) => {
+      const item = document.createElement("div");
+      item.className = "comment-item small";
+      const when = timeAgo(c.createdAt || Date.now());
 
-    const imageHtml = c.imageDataUrl
-      ? `
+      const imageHtml = c.imageDataUrl
+        ? `
         <div class="mt-1">
           <img
             src="${escapeHtml(c.imageDataUrl)}"
@@ -675,9 +685,9 @@ function renderCommentsForPost(postId, commentsSection) {
           />
         </div>
       `
-      : "";
+        : "";
 
-    item.innerHTML = `
+      item.innerHTML = `
       <div class="d-flex justify-content-between">
         <div>
           <strong>${escapeHtml(c.name || "Unknown")}</strong>
@@ -692,8 +702,8 @@ function renderCommentsForPost(postId, commentsSection) {
       </div>
       ${imageHtml}
     `;
-    listEl.appendChild(item);
-  });
+      listEl.appendChild(item);
+    });
 }
 
 // ===========================
@@ -726,7 +736,6 @@ function renderProfilePosts(user, isOwnProfile) {
       <div id="profilePostList"></div>
     </div>
   `;
-
   const listEl = postsContainer.querySelector("#profilePostList");
 
   if (!visiblePosts.length) {
@@ -742,8 +751,7 @@ function renderProfilePosts(user, isOwnProfile) {
   const users = loadUsers();
 
   visiblePosts.forEach((post) => {
-    const author =
-      users.find((u) => u.id === post.userId) || user;
+    const author = users.find((u) => u.id === post.userId) || user;
 
     const initials = getInitials(author.name || post.name);
     const avatarUrl = getAvatarUrlForUser(author);
@@ -814,27 +822,27 @@ function renderProfilePosts(user, isOwnProfile) {
             data-comments-for="${post.id}"
             hidden
           >
-          <div class="comment-list mb-2"></div>
+            <div class="comment-list mb-2"></div>
             <form class="comment-form">
               <div class="d-flex gap-2 mb-1">
+                <input
+                  type="text"
+                  class="form-control form-control-sm comment-input"
+                  placeholder="Write a comment…"
+                />
+                <button
+                  type="submit"
+                  class="btn btn-outline-soft btn-sm"
+                >
+                  Comment
+                </button>
+              </div>
               <input
-              type="text"
-              class="form-control form-control-sm comment-input"
-              placeholder="Write a comment…"
-            />
-            <button
-              type="submit"
-              class="btn btn-outline-soft btn-sm"
-              >
-              Comment
-            </button>
-          </div>
-            <input
-            type="file"
-            class="form-control form-control-sm comment-image-input"
-            accept="image/*"
-          />
-          </form>
+                type="file"
+                class="form-control form-control-sm comment-image-input"
+                accept="image/*"
+              />
+            </form>
           </div>
         </div>
       </div>
@@ -910,9 +918,11 @@ function setupEditProfileForm(user, isOwnProfile) {
 
       const updatedUser = { ...users[idx] };
 
-      if (nameInput) updatedUser.name = nameInput.value.trim() || updatedUser.name;
+      if (nameInput)
+        updatedUser.name = nameInput.value.trim() || updatedUser.name;
       if (usernameInput)
-        updatedUser.username = usernameInput.value.trim() || updatedUser.username;
+        updatedUser.username =
+          usernameInput.value.trim() || updatedUser.username;
       if (locationInput) updatedUser.location = locationInput.value.trim();
       if (websiteInput) updatedUser.website = websiteInput.value.trim();
       if (bioInput) updatedUser.bio = bioInput.value.trim();
@@ -1095,32 +1105,23 @@ document.addEventListener("submit", async function (e) {
   const text = input.value.trim();
   let imageDataUrl = null;
 
-  // 🔹 Resize image before saving (max 300px)
-  if (fileInput && fileInput.files && fileInput.files[0]) {
-  const file = fileInput.files[0];
-  try {
-    // Try to resize first
-    imageDataUrl = await resizeImageTo300px(file);
-  } catch (err) {
-    console.error("Error resizing comment image, falling back to raw data URL:", err);
+  const hasFile = fileInput && fileInput.files && fileInput.files[0];
+
+  if (hasFile) {
+    const file = fileInput.files[0];
     try {
       imageDataUrl = await readImageAsDataUrl(file);
-    } catch (err2) {
-      console.error("Error reading comment image as data URL:", err2);
+    } catch (err) {
+      console.error("Error reading comment image on this device:", err);
+      if (!text) {
+        alert(
+          "Your image couldn't be processed on this device. Try a smaller image or add some text."
+        );
+        return;
+      }
       imageDataUrl = null;
     }
   }
-}
-
-  // Fallback: just read the image as a data URL (no resize)
-async function readImageAsDataUrl(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (e) => resolve(e.target.result);
-    reader.onerror = (err) => reject(err);
-    reader.readAsDataURL(file);
-  });
-}
 
   // Must have either text or image
   if (!text && !imageDataUrl) return;
@@ -1144,7 +1145,7 @@ async function readImageAsDataUrl(file) {
     fileInput.value = "";
   }
 
-  // 🔹 Firestore
+  // Firestore
   try {
     await setDoc(doc(commentsCol, String(commentId)), comment);
   } catch (err) {
@@ -1269,4 +1270,3 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   renderProfile();
 });
-

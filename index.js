@@ -305,7 +305,17 @@ function timeAgo(timestamp) {
   return new Date(timestamp).toLocaleDateString();
 }
 
-// Resize an image file so the longest side is max 300px
+// Just read an image file as a data URL (no resize)
+async function readImageAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => resolve(e.target.result);
+    reader.onerror = (err) => reject(err);
+    reader.readAsDataURL(file);
+  });
+}
+
+// (Optional) Resize helper if you want it later
 async function resizeImageTo300px(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -336,7 +346,6 @@ async function resizeImageTo300px(file) {
           const ctx = canvas.getContext("2d");
           ctx.drawImage(img, 0, 0, width, height);
 
-          // JPEG at 90% quality
           const dataUrl = canvas.toDataURL("image/jpeg", 0.9);
           resolve(dataUrl);
         } catch (err) {
@@ -348,16 +357,6 @@ async function resizeImageTo300px(file) {
       img.src = e.target.result;
     };
 
-    reader.onerror = (err) => reject(err);
-    reader.readAsDataURL(file);
-  });
-}
-
-// Fallback: just read the image as a data URL (no resize)
-async function readImageAsDataUrl(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (e) => resolve(e.target.result);
     reader.onerror = (err) => reject(err);
     reader.readAsDataURL(file);
   });
@@ -594,16 +593,16 @@ function renderCommentsForPost(postId, commentsSection) {
   }
 
   comments
-  .slice()
-  .sort((a, b) => a.createdAt - b.createdAt)
-  .forEach((c) => {
-    const item = document.createElement("div");
-    item.className = "comment-item small";
+    .slice()
+    .sort((a, b) => a.createdAt - b.createdAt)
+    .forEach((c) => {
+      const item = document.createElement("div");
+      item.className = "comment-item small";
 
-    const when = timeAgo(c.createdAt || Date.now());
+      const when = timeAgo(c.createdAt || Date.now());
 
-    const imageHtml = c.imageDataUrl
-      ? `
+      const imageHtml = c.imageDataUrl
+        ? `
         <div class="mt-1">
           <img
             src="${escapeHtml(c.imageDataUrl)}"
@@ -612,9 +611,9 @@ function renderCommentsForPost(postId, commentsSection) {
           />
         </div>
       `
-      : "";
+        : "";
 
-    item.innerHTML = `
+      item.innerHTML = `
       <div class="d-flex justify-content-between">
         <div>
           <strong>${escapeHtml(c.name || "Unknown")}</strong>
@@ -630,8 +629,8 @@ function renderCommentsForPost(postId, commentsSection) {
       ${imageHtml}
     `;
 
-    listEl.appendChild(item);
-  });
+      listEl.appendChild(item);
+    });
 }
 
 // ===========================
@@ -741,23 +740,23 @@ function renderPosts() {
 
           <div class="post-comments mt-2" data-comments-for="${post.id}" hidden>
             <div class="comment-list mb-2"></div>
-              <form class="comment-form">
-                <div class="d-flex gap-2 mb-1">
-                  <input
-                    type="text"
-                    class="form-control form-control-sm comment-input"
-                    placeholder="Write a comment…"
-                  />
-                  <button type="submit" class="btn btn-outline-soft btn-sm">
-                    Comment
-                  </button>
-                  </div>
-                  <input
-                    type="file"
-                    class="form-control form-control-sm comment-image-input"
-                    accept="image/*"
-                  />
-                </form>
+            <form class="comment-form">
+              <div class="d-flex gap-2 mb-1">
+                <input
+                  type="text"
+                  class="form-control form-control-sm comment-input"
+                  placeholder="Write a comment…"
+                />
+                <button type="submit" class="btn btn-outline-soft btn-sm">
+                  Comment
+                </button>
+              </div>
+              <input
+                type="file"
+                class="form-control form-control-sm comment-image-input"
+                accept="image/*"
+              />
+            </form>
           </div>
         </div>
       </div>
@@ -1386,24 +1385,27 @@ document.addEventListener("submit", async function (e) {
   const text = input.value.trim();
   let imageDataUrl = null;
 
-  if (fileInput && fileInput.files && fileInput.files[0]) {
-  const file = fileInput.files[0];
-  try {
-    // Try to resize first
-    imageDataUrl = await resizeImageTo300px(file);
-  } catch (err) {
-    console.error("Error resizing comment image, falling back to raw data URL:", err);
+  const hasFile = fileInput && fileInput.files && fileInput.files[0];
+
+  // If there is a file, try to read it as a data URL
+  if (hasFile) {
+    const file = fileInput.files[0];
     try {
-      // Fallback: no resize, just read
       imageDataUrl = await readImageAsDataUrl(file);
-    } catch (err2) {
-      console.error("Error reading comment image as data URL:", err2);
+    } catch (err) {
+      console.error("Error reading comment image on this device:", err);
+      // If the user put text, we still post the text-only comment.
+      if (!text) {
+        alert(
+          "Your image couldn't be processed on this device. Try a smaller image or add some text."
+        );
+        return;
+      }
       imageDataUrl = null;
     }
   }
-}
 
-  // Require either text or image
+  // If no text and no image, do nothing
   if (!text && !imageDataUrl) return;
 
   const commentId = Date.now();
@@ -1425,7 +1427,7 @@ document.addEventListener("submit", async function (e) {
     fileInput.value = "";
   }
 
-  // Firestore
+  // Firestore write (even if it fails, local comment still shows)
   try {
     await setDoc(doc(commentsCol, String(commentId)), comment);
   } catch (err) {
@@ -1491,7 +1493,7 @@ document.addEventListener("click", function (e) {
 });
 
 // ===========================
-//  LOGOUT
+//  LOGOUT BUTTONS (legacy header version)
 // ===========================
 function updateAuthButtons() {
   const current = getCurrentUser();
@@ -1511,4 +1513,3 @@ function updateAuthButtons() {
     logoutBtn.style.display = "none";
   }
 }
-
