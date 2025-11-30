@@ -305,6 +305,64 @@ function timeAgo(timestamp) {
   return new Date(timestamp).toLocaleDateString();
 }
 
+// Resize an image file so the longest side is max 300px
+async function resizeImageTo300px(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    const img = new Image();
+
+    reader.onload = (e) => {
+      img.onload = () => {
+        try {
+          const maxSize = 300;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > maxSize) {
+              height = Math.round(height * (maxSize / width));
+              width = maxSize;
+            }
+          } else {
+            if (height > maxSize) {
+              width = Math.round(width * (maxSize / height));
+              height = maxSize;
+            }
+          }
+
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(img, 0, 0, width, height);
+
+          // JPEG at 90% quality
+          const dataUrl = canvas.toDataURL("image/jpeg", 0.9);
+          resolve(dataUrl);
+        } catch (err) {
+          reject(err);
+        }
+      };
+
+      img.onerror = (err) => reject(err);
+      img.src = e.target.result;
+    };
+
+    reader.onerror = (err) => reject(err);
+    reader.readAsDataURL(file);
+  });
+}
+
+// Fallback: just read the image as a data URL (no resize)
+async function readImageAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => resolve(e.target.result);
+    reader.onerror = (err) => reject(err);
+    reader.readAsDataURL(file);
+  });
+}
+
 // ===========================
 //  TOPIC STATS & POPULAR TOPICS
 // ===========================
@@ -1323,27 +1381,29 @@ document.addEventListener("submit", async function (e) {
   const postId = Number(article.dataset.postId);
   const input = form.querySelector(".comment-input");
   const fileInput = form.querySelector(".comment-image-input");
-
   if (!input) return;
 
   const text = input.value.trim();
   let imageDataUrl = null;
 
-  // Read image if one is selected
   if (fileInput && fileInput.files && fileInput.files[0]) {
-    const file = fileInput.files[0];
-    imageDataUrl = await new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (event) => resolve(event.target.result);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    }).catch((err) => {
-      console.error("Error reading comment image:", err);
-      return null;
-    });
+  const file = fileInput.files[0];
+  try {
+    // Try to resize first
+    imageDataUrl = await resizeImageTo300px(file);
+  } catch (err) {
+    console.error("Error resizing comment image, falling back to raw data URL:", err);
+    try {
+      // Fallback: no resize, just read
+      imageDataUrl = await readImageAsDataUrl(file);
+    } catch (err2) {
+      console.error("Error reading comment image as data URL:", err2);
+      imageDataUrl = null;
+    }
   }
+}
 
-  // Don't post empty: must be text or image
+  // Require either text or image
   if (!text && !imageDataUrl) return;
 
   const commentId = Date.now();
