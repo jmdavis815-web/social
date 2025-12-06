@@ -858,16 +858,18 @@ function renderProfilePosts(user, isOwnProfile) {
 let pendingAvatarDataUrl = null;
 
 function setupEditProfileForm(user, isOwnProfile) {
-  const editCard = document.getElementById("profileEditCard");
-  const form = document.getElementById("profileEditForm");
-  if (!editCard || !form) return;
+  const form = document.getElementById("editProfileForm");
+  const card = document.getElementById("profileEditCard");
 
+  if (!form || !card) return;
+
+  // Only show edit form on your own profile
   if (!isOwnProfile) {
-    editCard.hidden = true;
+    card.style.display = "none";
     return;
+  } else {
+    card.style.display = "";
   }
-
-  editCard.hidden = false;
 
   const nameInput = document.getElementById("editName");
   const usernameInput = document.getElementById("editUsername");
@@ -876,26 +878,30 @@ function setupEditProfileForm(user, isOwnProfile) {
   const bioInput = document.getElementById("editBio");
   const avatarInput = document.getElementById("editAvatarInput");
 
+  // Prefill fields
   if (nameInput) nameInput.value = user.name || "";
   if (usernameInput) usernameInput.value = user.username || "";
   if (locationInput) locationInput.value = user.location || "";
   if (websiteInput) websiteInput.value = user.website || "";
   if (bioInput) bioInput.value = user.bio || "";
 
+  // Start with whatever avatar the user already has
   pendingAvatarDataUrl = user.avatarDataUrl || null;
 
+  // When user picks a new image file
   if (avatarInput) {
     avatarInput.value = "";
     avatarInput.onchange = function () {
       const file = avatarInput.files && avatarInput.files[0];
       if (!file) {
+        // Reset to current avatar if they cancel
         pendingAvatarDataUrl = user.avatarDataUrl || null;
         return;
       }
 
       const reader = new FileReader();
       reader.onload = (event) => {
-        pendingAvatarDataUrl = event.target.result;
+        pendingAvatarDataUrl = event.target.result; // base64 image
       };
       reader.onerror = () => {
         pendingAvatarDataUrl = user.avatarDataUrl || null;
@@ -916,6 +922,7 @@ function setupEditProfileForm(user, isOwnProfile) {
         return;
       }
 
+      // ✅ FIXED: spread the existing user instead of `{ .users[idx] }`
       const updatedUser = { ...users[idx] };
 
       if (nameInput)
@@ -927,6 +934,7 @@ function setupEditProfileForm(user, isOwnProfile) {
       if (websiteInput) updatedUser.website = websiteInput.value.trim();
       if (bioInput) updatedUser.bio = bioInput.value.trim();
 
+      // If a new avatar was chosen, store it
       if (pendingAvatarDataUrl) {
         updatedUser.avatarDataUrl = pendingAvatarDataUrl;
       }
@@ -940,7 +948,6 @@ function setupEditProfileForm(user, isOwnProfile) {
         bio: updatedUser.bio || "",
         avatarDataUrl: updatedUser.avatarDataUrl || null,
       }).catch(async (err) => {
-        // if doc doesn't exist yet (old local user), create it
         console.warn("updateDoc failed, trying setDoc", err);
         await setDoc(doc(usersCol, String(updatedUser.id)), updatedUser);
       });
@@ -954,7 +961,7 @@ function setupEditProfileForm(user, isOwnProfile) {
         setCurrentUser(updatedUser);
       }
 
-      // Update posts to reflect new name/username in local cache
+      // Update posts with new name/username
       const posts = loadPosts();
       let changed = false;
       posts.forEach((p) => {
@@ -968,7 +975,7 @@ function setupEditProfileForm(user, isOwnProfile) {
         savePosts(posts);
       }
 
-      // Re-render profile sections
+      // Re-render profile sections so the new avatar shows up immediately
       renderProfileHeader(updatedUser, true);
       renderProfileAbout(updatedUser);
       renderProfileTopics(updatedUser);
