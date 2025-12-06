@@ -43,6 +43,52 @@ const CURRENT_USER_KEY = "openwall-current";  // current logged-in user
 const POSTS_KEY = "openwall-posts";           // array of posts
 const COMMENTS_KEY = "openwall-comments";     // map: postId -> array of comments
 const FOLLOWS_KEY = "openwall-follows";       // map followerId -> [followedUserId, ...]
+const LIKES_KEY = "openwall-likes";         // map userId -> [likedPostId, ...]
+
+function loadLikes() {
+  try {
+    return JSON.parse(localStorage.getItem(LIKES_KEY)) || {};
+  } catch {
+    return {};
+  }
+}
+
+function saveLikes(map) {
+  localStorage.setItem(LIKES_KEY, JSON.stringify(map));
+}
+
+// Returns an array of postIds this user has liked
+function getUserLikedPostIds(userId) {
+  if (!userId) return [];
+  const map = loadLikes();
+  const entry = map[String(userId)];
+  return Array.isArray(entry) ? entry : [];
+}
+
+function hasUserLikedPost(userId, postId) {
+  if (!userId || !postId) return false;
+  const likedIds = getUserLikedPostIds(userId);
+  return likedIds.includes(postId);
+}
+
+// Set or clear a like for (userId, postId)
+function setUserLike(userId, postId, liked) {
+  if (!userId || !postId) return;
+
+  const map = loadLikes();
+  const key = String(userId);
+  let list = Array.isArray(map[key]) ? map[key] : [];
+
+  const idx = list.indexOf(postId);
+  if (liked) {
+    if (idx === -1) list.push(postId);
+  } else {
+    if (idx !== -1) list.splice(idx, 1);
+  }
+
+  map[key] = list;
+  saveLikes(map);
+}
 
 // ===========================
 //  YEAR IN FOOTER
@@ -666,6 +712,9 @@ function renderPosts() {
     return;
   }
 
+  const currentUser = getCurrentUser();
+  const likedPostIds = currentUser ? getUserLikedPostIds(currentUser.id) : [];
+
   posts.forEach((post) => {
     const article = document.createElement("article");
     article.className = "post-card";
@@ -686,6 +735,8 @@ function renderPosts() {
     const visibility = post.visibility || "Public";
     const likes = post.likes ?? 0;
     const commentCount = (commentsMap[String(post.id)] || []).length;
+    const userHasLiked =
+    currentUser && likedPostIds.includes(post.id);
 
     const avatarHtml = avatarUrl
       ? `
@@ -723,8 +774,13 @@ function renderPosts() {
           </div>
 
           <div class="post-actions">
-            <button type="button" class="like-btn" data-liked="false" data-count="${likes}">
-              <span class="heart-icon">♡</span>
+            <button
+              type="button"
+              class="like-btn"
+              data-liked="${userHasLiked}"
+              data-count="${likes}"
+            >
+              <span class="heart-icon">${userHasLiked ? "♥" : "♡"}</span>
               <span class="like-count">${likes}</span>
             </button>
 
@@ -737,6 +793,7 @@ function renderPosts() {
               <i>↻</i> Share
             </button>
           </div>
+
 
           <div class="post-comments mt-2" data-comments-for="${post.id}" hidden>
             <div class="comment-list mb-2"></div>
@@ -1231,46 +1288,66 @@ if (loginForm) {
 // ===========================
 //  LIKE BUTTON TOGGLE (with Firestore update)
 // ===========================
+// ===========================
+//  LIKE BUTTON TOGGLE (per-user, saved)
+// ===========================
 document.addEventListener("click", async function (e) {
   const btn = e.target.closest(".like-btn");
   if (!btn) return;
 
-  let liked = btn.getAttribute("data-liked") === "true";
+  const user = getCurrentUser();
+  if (!user) {
+    const loginModalEl = document.getElementById("loginModal");
+    if (loginModalEl && typeof bootstrap !== "undefined") {
+      const modalInstance =
+        bootstrap.Modal.getInstance(loginModalEl) ||
+        new bootstrap.Modal(loginModalEl);
+      modalInstance.show();
+    } else {
+      alert("Log in to like posts.");
+    }
+    return;
+  }
+
+  const article = btn.closest(".post-card");
+  if (!article || !article.dataset.postId) return;
+
+  const postId = Number(article.dataset.postId);
   let count = parseInt(btn.getAttribute("data-count"), 10) || 0;
 
-  liked = !liked;
-  btn.setAttribute("data-liked", liked);
+  // 🔹 Check if this user has already liked this post
+  const alreadyLiked = hasUserLikedPost(user.id, postId);
+  const nowLiked = !alreadyLiked;
 
-  count = liked ? count + 1 : Math.max(0, count - 1);
+  // Update local like map
+  setUserLike(user.id, postId, nowLiked);
+
+  // Update count
+  count = nowLiked ? count + 1 : Math.max(0, count - 1);
+
+  // Update button UI
+  btn.setAttribute("data-liked", nowLiked);
   btn.setAttribute("data-count", count);
 
   const heartEl = btn.querySelector(".heart-icon");
   const countEl = btn.querySelector(".like-count");
 
-  if (heartEl) {
-    heartEl.textContent = liked ? "♥" : "♡";
-  }
-  if (countEl) {
-    countEl.textContent = count;
-  }
+  if (heartEl) heartEl.textContent = nowLiked ? "♥" : "♡";
+  if (countEl) countEl.textContent = count;
 
-  const article = btn.closest(".post-card");
-  if (article && article.dataset.postId) {
-    const postId = Number(article.dataset.postId);
-    const posts = loadPosts();
-    const index = posts.findIndex((p) => p.id === postId);
-    if (index !== -1) {
-      posts[index].likes = count;
-      savePosts(posts);
-      renderPopularTopics();
-      renderPeopleToFollow();
+  // Update local posts array + Firestore
+  const posts = loadPosts();
+  const index = posts.findIndex((p) => p.id === postId);
+  if (index !== -1) {
+    posts[index].likes = count;
+    savePosts(posts);
+    renderPopularTopics();
+    renderPeopleToFollow();
 
-      // Firestore update
-      try {
-        await updateDoc(doc(postsCol, String(postId)), { likes: count });
-      } catch (err) {
-        console.error("Error updating likes in Firestore:", err);
-      }
+    try {
+      await updateDoc(doc(postsCol, String(postId)), { likes: count });
+    } catch (err) {
+      console.error("Error updating likes in Firestore:", err);
     }
   }
 });
