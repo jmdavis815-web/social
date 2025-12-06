@@ -574,7 +574,11 @@ function renderProfileHeader(user, isOwnProfile) {
           </div>
         </div>
       </div>
-      ${followBtnHtml}
+      ${isOwnProfile
+  ? `<button id="editProfileBtn" class="btn btn-outline-soft btn-sm">Edit</button>`
+  : followBtnHtml
+}
+
     </div>
   `;
 }
@@ -863,12 +867,15 @@ function setupEditProfileForm(user, isOwnProfile) {
 
   if (!form || !card) return;
 
-  // Only show edit form on your own profile
+  // Only show edit section for your own profile
   if (!isOwnProfile) {
     card.style.display = "none";
+    card.setAttribute("hidden", "true");
     return;
   } else {
-    card.style.display = "";
+    // keep it hidden by default; Edit button will reveal it
+    card.style.display = "none";
+    card.setAttribute("hidden", "true");
   }
 
   const nameInput = document.getElementById("editName");
@@ -886,29 +893,30 @@ function setupEditProfileForm(user, isOwnProfile) {
   if (bioInput) bioInput.value = user.bio || "";
 
   // Start with whatever avatar the user already has
-  pendingAvatarDataUrl = user.avatarDataUrl || null;
+  pendingAvatarDataUrl = user.avatarDataUrl || user.avatar || null;
 
-  // When user picks a new image file
+  // When user picks a new image file, RESIZE IT and store as data URL
   if (avatarInput) {
     avatarInput.value = "";
-    avatarInput.onchange = function () {
+    avatarInput.addEventListener("change", async () => {
       const file = avatarInput.files && avatarInput.files[0];
       if (!file) {
         // Reset to current avatar if they cancel
-        pendingAvatarDataUrl = user.avatarDataUrl || null;
+        pendingAvatarDataUrl = user.avatarDataUrl || user.avatar || null;
         return;
       }
 
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        pendingAvatarDataUrl = event.target.result; // base64 image
-      };
-      reader.onerror = () => {
-        pendingAvatarDataUrl = user.avatarDataUrl || null;
-        showToastError("Could not read that image file.");
-      };
-      reader.readAsDataURL(file);
-    };
+      try {
+        // 🔹 Use the helper you already defined
+        const resizedDataUrl = await resizeImageTo300px(file);
+        pendingAvatarDataUrl = resizedDataUrl;
+        showToastSuccess("New profile picture ready — don’t forget to save.");
+      } catch (err) {
+        console.error("Error processing avatar image:", err);
+        pendingAvatarDataUrl = user.avatarDataUrl || user.avatar || null;
+        showToastError("Couldn’t process that image. Try a smaller file.");
+      }
+    });
   }
 
   form.onsubmit = async function (e) {
@@ -922,7 +930,7 @@ function setupEditProfileForm(user, isOwnProfile) {
         return;
       }
 
-      // ✅ FIXED: spread the existing user instead of `{ .users[idx] }`
+      // Start from the existing user record
       const updatedUser = { ...users[idx] };
 
       if (nameInput)
@@ -934,7 +942,7 @@ function setupEditProfileForm(user, isOwnProfile) {
       if (websiteInput) updatedUser.website = websiteInput.value.trim();
       if (bioInput) updatedUser.bio = bioInput.value.trim();
 
-      // If a new avatar was chosen, store it
+      // 🔹 If we have an avatar data URL, store it
       if (pendingAvatarDataUrl) {
         updatedUser.avatarDataUrl = pendingAvatarDataUrl;
       }
@@ -1255,6 +1263,28 @@ document.addEventListener("click", (e) => {
 
   // Send back to home
   window.location.href = "index.html";
+});
+
+// ===========================
+//  EDIT PROFILE BUTTON HANDLER
+// ===========================
+document.addEventListener("click", function (e) {
+  const btn = e.target.closest("#editProfileBtn");
+  if (!btn) return;
+
+  const card = document.getElementById("profileEditCard");
+  if (!card) return;
+
+  const isHidden = card.style.display === "none" || card.hasAttribute("hidden");
+
+  if (isHidden) {
+    card.style.display = "";    // show
+    card.removeAttribute("hidden");
+    btn.textContent = "Close";
+  } else {
+    card.style.display = "none"; // hide
+    btn.textContent = "Edit";
+  }
 });
 
 // ===========================
