@@ -706,6 +706,7 @@ function renderPosts() {
     const article = document.createElement("article");
     article.className = "post-card mb-2";
     article.dataset.postId = post.id;
+    article.id = `post-${post.id}`;
 
     article.innerHTML = `
       <div class="d-flex gap-2">
@@ -745,24 +746,28 @@ function renderPosts() {
           </div>
 
           <div class="post-actions mt-1">
-            <button
-              type="button"
-              class="like-btn"
-              data-liked="${userLiked}"
-              data-count="${likes}"
-            >
-              <span class="heart-icon">${userLiked ? "♥" : "♡"}</span>
-              <span class="like-count">${likes}</span>
-            </button>
+  <button
+    type="button"
+    class="like-btn"
+    data-liked="${userLiked}"
+    data-count="${likes}"
+  >
+    <span class="heart-icon">${userLiked ? "♥" : "♡"}</span>
+    <span class="like-count">${likes}</span>
+  </button>
 
-            <button type="button" class="comment-btn">
-              💬 <span class="comment-count">${commentCount}</span>
-            </button>
+  <button type="button" class="comment-btn">
+    💬 <span class="comment-count">${commentCount}</span>
+  </button>
 
-            <button type="button">
-              ↻ Share
-            </button>
-          </div>
+  <button
+    type="button"
+    class="share-btn"
+    data-post-id="${post.id}"
+  >
+    ↻ Share
+  </button>
+</div>
 
           <div class="post-comments mt-2" hidden>
             <div class="comment-list mb-2"></div>
@@ -1447,8 +1452,53 @@ if (loginForm) {
 }
 
 // ===========================
-//  LIKE BUTTON TOGGLE (with Firestore update)
+//  SHARE BUTTON (copy link / Web Share API)
 // ===========================
+document.addEventListener("click", async function (e) {
+  const btn = e.target.closest(".share-btn");
+  if (!btn) return;
+
+  const article = btn.closest(".post-card");
+  if (!article || !article.dataset.postId) return;
+
+  const postId = Number(article.dataset.postId);
+
+  // Make sure the comments panel is open when you share from here
+  const commentsSection = article.querySelector(".post-comments");
+  if (commentsSection) {
+    commentsSection.removeAttribute("hidden");
+  }
+
+  // Build a simple permalink to this post
+  const baseUrl = `${window.location.origin}${window.location.pathname}`;
+  const url = `${baseUrl}?postId=${postId}#post-${postId}`;
+
+  const postBodyEl = article.querySelector(".post-body");
+  const textSnippet = postBodyEl
+    ? postBodyEl.textContent.trim().slice(0, 140)
+    : "Check out this post on OpenWall";
+
+  try {
+    if (navigator.share) {
+      // Mobile / modern browsers
+      await navigator.share({
+        title: "OpenWall post",
+        text: textSnippet,
+        url,
+      });
+    } else if (navigator.clipboard && navigator.clipboard.writeText) {
+      // Fallback: copy link
+      await navigator.clipboard.writeText(url);
+      alert("Link copied to your clipboard!");
+    } else {
+      // Old-school fallback
+      prompt("Copy this link:", url);
+    }
+  } catch (err) {
+    console.error("Error sharing post:", err);
+  }
+});
+
 // ===========================
 //  LIKE BUTTON TOGGLE (per-user, saved)
 // ===========================
