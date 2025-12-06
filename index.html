@@ -166,31 +166,30 @@
       <section aria-label="Main feed">
         <!-- Composer -->
         <div class="composer-card">
-          <div class="d-flex align-items-start gap-2">
-            <div class="composer-avatar">M</div>
-            <div class="flex-grow-1">
-              <input
-                type="text"
-                class="composer-input"
-                placeholder="Share what’s on your mind…"
-                disabled
-              >
-              <div class="d-flex justify-content-between align-items-center mt-2">
-                <small class="text-body-secondary composer-note">
-                  Log in or create an account to start posting.
-                </small>
-                <button
-                  class="btn btn-main btn-sm"
-                  type="button"
-                  data-bs-toggle="modal"
-                  data-bs-target="#loginModal"
-                >
-                  Log in to post
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+  <textarea
+    class="form-control composer-input"
+    rows="3"
+    placeholder="Share what's on your mind…"
+  ></textarea>
+
+  <!-- NEW: image upload for posts -->
+  <div class="mt-2">
+    <input 
+      title="Comment here"
+      type="file"
+      class="form-control form-control-sm composer-image-input"
+      accept="image/*"
+    />
+  </div>
+
+  <div class="d-flex justify-content-between align-items-center mt-2">
+    <small class="composer-note text-body-secondary">
+      Log in or create an account to start posting.
+    </small>
+    <button class="btn btn-main" type="button">Post</button>
+  </div>
+</div>
+
 
         <!-- ACTIVE TOPIC FILTER BAR -->
         <div id="activeFilterBar" class="active-filter-bar" hidden>

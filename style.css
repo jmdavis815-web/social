@@ -295,8 +295,8 @@ body {
 /* Profile-specific avatar wrappers */
 
 .profile-avatar-wrapper {
-  width: 64px;
-  height: 64px;
+  width: 100px;
+  height: 100px;
   position: relative;
   border-radius: 50%;
   overflow: hidden;
@@ -714,6 +714,13 @@ small.text-body-secondary {
   font-weight: 600;
   font-size: 0.8rem;
   text-transform: uppercase;
+}
+
+.post-image-img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.75rem;
+  display: block;
 }
 
 

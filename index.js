@@ -703,6 +703,18 @@ function renderPosts() {
 
     const bodyHtml = escapeHtml(post.body || "").replace(/\n/g, "<br>");
 
+    const postImageHtml = post.imageDataUrl
+  ? `
+    <div class="post-image mt-2">
+      <img
+        src="${escapeHtml(post.imageDataUrl)}"
+        alt="Post image"
+        class="post-image-img"
+      />
+    </div>
+  `
+  : "";
+
     const article = document.createElement("article");
     article.className = "post-card mb-2";
     article.dataset.postId = post.id;
@@ -743,6 +755,7 @@ function renderPosts() {
 
           <div class="post-body">
             ${bodyHtml}
+            ${postImageHtml}
           </div>
 
           <div class="post-actions mt-1">
@@ -1177,6 +1190,7 @@ const composerInputEl = document.querySelector(".composer-input");
 const composerButtonEl = document.querySelector(
   ".composer-card button.btn-main"
 );
+const composerImageInputEl = document.querySelector(".composer-image-input");
 
 if (composerButtonEl && composerInputEl) {
   composerButtonEl.addEventListener("click", async () => {
@@ -1186,7 +1200,33 @@ if (composerButtonEl && composerInputEl) {
     }
 
     const text = composerInputEl.value.trim();
-    if (!text) return;
+    const hasText = !!text;
+
+    let imageDataUrl = null;
+    const hasImageFile =
+      composerImageInputEl &&
+      composerImageInputEl.files &&
+      composerImageInputEl.files[0];
+
+    // If there is an image file, try to resize it
+    if (hasImageFile) {
+      const file = composerImageInputEl.files[0];
+      try {
+        imageDataUrl = await resizeImageTo300px(file);
+      } catch (err) {
+        console.error("Error reading post image:", err);
+        if (!hasText) {
+          alert(
+            "Your image couldn't be processed. Try a smaller image or add some text."
+          );
+          return;
+        }
+        imageDataUrl = null;
+      }
+    }
+
+    // If no text and no image, do nothing
+    if (!hasText && !imageDataUrl) return;
 
     const posts = loadPosts();
     const now = Date.now();
@@ -1201,6 +1241,7 @@ if (composerButtonEl && composerInputEl) {
       visibility: "Public",
       likes: 0,
       tags: extractTagsFromText(text),
+      imageDataUrl: imageDataUrl || null, // 👈 store post image
     };
 
     posts.push(newPost);
@@ -1213,7 +1254,12 @@ if (composerButtonEl && composerInputEl) {
       console.error("Error writing post to Firestore:", err);
     }
 
+    // Clear inputs
     composerInputEl.value = "";
+    if (composerImageInputEl) {
+      composerImageInputEl.value = "";
+    }
+
     renderPosts();
     renderPopularTopics();
     renderActiveTopicBar();
