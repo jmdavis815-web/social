@@ -11,6 +11,7 @@ import {
   updateDoc,
   deleteDoc,
   query,
+  where,
   orderBy,
 } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 
@@ -84,6 +85,19 @@ const USERS_KEY = "openwall-users";
 const POSTS_KEY = "openwall-posts";
 const COMMENTS_KEY = "openwall-comments"; // shared with index.js
 const CURRENT_USER_KEY = "openwall-current";
+const LIKES_KEY = "openwall-likes";  
+
+function loadLikes() {
+  try {
+    return JSON.parse(localStorage.getItem(LIKES_KEY)) || {};
+  } catch {
+    return {};
+  }
+}
+
+function saveLikes(map) {
+  localStorage.setItem(LIKES_KEY, JSON.stringify(map));
+}// 👈 add this
 
 // Follows: followerId -> [followedUserId, ...] (local cache)
 const FOLLOWS_KEY = "openwall-follows";
@@ -180,6 +194,12 @@ function timeAgo(timestamp) {
   if (diffDay < 7) return `${diffDay}d ago`;
 
   return new Date(timestamp).toLocaleDateString();
+}
+
+function extractTagsFromText(text) {
+  if (!text) return [];
+  const matches = text.match(/#(\w+)/g) || [];
+  return matches.map((tag) => tag.slice(1).toLowerCase());
 }
 
 // Resize an image file so the longest side is max 300px
@@ -732,15 +752,49 @@ function renderProfilePosts(user, isOwnProfile) {
 
   const commentsMap = loadCommentsMap();
 
-  postsContainer.innerHTML = `
+    postsContainer.innerHTML = `
     <div class="card-body">
       <div class="d-flex justify-content-between align-items-center mb-2">
         <h2 class="h6 mb-0">Posts</h2>
       </div>
+
+      ${
+        isOwnProfile
+          ? `
+      <div class="mb-3" id="profileComposer">
+        <textarea
+          id="profileComposerInput"
+          class="form-control form-control-sm"
+          rows="2"
+          placeholder="Share something on your wall…"
+        ></textarea>
+        <div class="d-flex justify-content-between align-items-center mt-1">
+          <small class="text-body-secondary">
+            Posts you share here will appear on your wall and the main feed.
+          </small>
+          <button
+            id="profileComposerBtn"
+            type="button"
+            class="btn btn-main btn-sm"
+          >
+            Post
+          </button>
+        </div>
+      </div>
+          `
+          : ""
+      }
+
       <div id="profilePostList"></div>
     </div>
   `;
+
   const listEl = postsContainer.querySelector("#profilePostList");
+
+    // Wire up the composer after posts render
+  if (isOwnProfile) {
+    setupProfileComposer(user);
+  }
 
   if (!visiblePosts.length) {
     const empty = document.createElement("div");
@@ -754,7 +808,7 @@ function renderProfilePosts(user, isOwnProfile) {
 
   const users = loadUsers();
 
-  visiblePosts.forEach((post) => {
+    visiblePosts.forEach((post) => {
     const author = users.find((u) => u.id === post.userId) || user;
 
     const initials = getInitials(author.name || post.name);
@@ -776,7 +830,10 @@ function renderProfilePosts(user, isOwnProfile) {
 
     const bodyHtml = escapeHtml(post.body || "").replace(/\n/g, "<br>");
 
-    article.innerHTML = `
+    const currentUser = getCurrentUser();
+    const canDelete = currentUser && currentUser.id === post.userId; // 👈
+
+        article.innerHTML = `
       <div class="d-flex gap-2">
         <div class="post-avatar">
           ${avatarInner}
@@ -791,9 +848,22 @@ function renderProfilePosts(user, isOwnProfile) {
                 author.username || post.username || "user"
               )}</span>
             </div>
-            <span class="post-meta">${when} · ${escapeHtml(
-              visibility
-            )}</span>
+            <div class="d-flex align-items-center gap-2">
+              ${
+                canDelete
+                  ? `<button
+                       type="button"
+                       class="btn btn-link btn-sm text-danger p-0 delete-post-btn"
+                       data-post-id="${post.id}"
+                     >
+                       Delete
+                     </button>`
+                  : ""
+              }
+              <span class="post-meta">${when} · ${escapeHtml(
+                visibility
+              )}</span>
+            </div>
           </div>
           <div class="post-body">
             ${bodyHtml}
@@ -993,6 +1063,66 @@ function setupEditProfileForm(user, isOwnProfile) {
     } catch (err) {
       console.error(err);
       showToastError("Something went wrong. Please try again.");
+    }
+  };
+}
+
+function setupProfileComposer(profileUser) {
+  const input = document.getElementById("profileComposerInput");
+  const btn = document.getElementById("profileComposerBtn");
+  if (!input || !btn) return;
+
+  // Avoid stacking multiple listeners on re-render
+  btn.onclick = null;
+  input.onkeydown = null;
+
+  const handlePost = async () => {
+    const current = getCurrentUser();
+    if (!current || current.id !== profileUser.id) {
+      alert("You need to be logged in as this user to post here.");
+      return;
+    }
+
+    const text = input.value.trim();
+    if (!text) return;
+
+    const posts = loadPosts();
+    const now = Date.now();
+
+    const newPost = {
+      id: now,
+      userId: current.id,
+      name: current.name,
+      username: current.username,
+      body: text,
+      createdAt: now,
+      visibility: "Public",
+      likes: 0,
+      tags: extractTagsFromText(text),
+    };
+
+    posts.push(newPost);
+    savePosts(posts);
+
+    try {
+      await setDoc(doc(postsCol, String(newPost.id)), newPost);
+    } catch (err) {
+      console.error("Error writing profile post to Firestore:", err);
+    }
+
+    input.value = "";
+
+    // Re-render whole profile so stats, topics, and posts update
+    renderProfile();
+  };
+
+  btn.onclick = handlePost;
+
+  // Optional: Ctrl+Enter (or Cmd+Enter) to post
+  input.onkeydown = (e) => {
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      handlePost();
     }
   };
 }
@@ -1287,6 +1417,82 @@ document.addEventListener("click", function (e) {
   } else {
     card.style.display = "none"; // hide
     btn.textContent = "Edit";
+  }
+});
+
+// ===========================
+//  DELETE POST (Profile page)
+// ===========================
+document.addEventListener("click", async function (e) {
+  const btn = e.target.closest(".delete-post-btn");
+  if (!btn) return;
+
+  // Only handle deletes inside the profile posts card
+  if (!btn.closest("#profilePosts")) return;
+
+  const currentUser = getCurrentUser();
+  if (!currentUser) {
+    alert("Log in to delete your posts.");
+    return;
+  }
+
+  const postId = Number(btn.getAttribute("data-post-id"));
+  if (!postId) return;
+
+  const posts = loadPosts();
+  const post = posts.find((p) => p.id === postId);
+  if (!post) return;
+
+  if (post.userId !== currentUser.id) {
+    alert("You can only delete your own posts.");
+    return;
+  }
+
+  if (!confirm("Delete this post? This cannot be undone.")) return;
+
+  // 1) Remove from local posts
+  const updatedPosts = posts.filter((p) => p.id !== postId);
+  savePosts(updatedPosts);
+
+  // 2) Remove its comments locally
+  const commentsMap = loadCommentsMap();
+  delete commentsMap[String(postId)];
+  saveCommentsMap(commentsMap);
+
+  // 3) Clean it out of likes map (optional but tidy)
+  const likesMap = loadLikes();
+  Object.keys(likesMap).forEach((uid) => {
+    const list = likesMap[uid];
+    if (Array.isArray(list)) {
+      likesMap[uid] = list.filter((id) => id !== postId);
+    }
+  });
+  saveLikes(likesMap);
+
+  // 4) Delete from Firestore: post + its comments
+  try {
+    await deleteDoc(doc(postsCol, String(postId)));
+  } catch (err) {
+    console.error("Error deleting post from Firestore:", err);
+  }
+
+  try {
+    const q = query(commentsCol, where("postId", "==", postId));
+    const snap = await getDocs(q);
+    const deletions = snap.docs.map((d) => deleteDoc(doc(commentsCol, d.id)));
+    await Promise.all(deletions);
+  } catch (err) {
+    console.error("Error deleting comments for post:", err);
+  }
+
+  // 5) Re-render profile UI so counts + posts update
+  const profileUser = getProfileUser();
+  if (profileUser) {
+    const isOwnProfile = currentUser.id === profileUser.id;
+    renderProfileHeader(profileUser, isOwnProfile);
+    renderProfileAbout(profileUser);
+    renderProfileTopics(profileUser);
+    renderProfilePosts(profileUser, isOwnProfile);
   }
 });
 
