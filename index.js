@@ -735,8 +735,10 @@ function renderPosts() {
     const visibility = post.visibility || "Public";
     const likes = post.likes ?? 0;
     const commentCount = (commentsMap[String(post.id)] || []).length;
-    const userHasLiked =
     currentUser && likedPostIds.includes(post.id);
+    const userHasLiked = currentUser && likedPostIds.includes(post.id);
+    const isOwnPost = currentUser && currentUser.id === post.userId;
+
 
     const avatarHtml = avatarUrl
       ? `
@@ -751,73 +753,85 @@ function renderPosts() {
       : `<div class="post-avatar">${escapeHtml(initials)}</div>`;
 
     article.innerHTML = `
-      <div class="d-flex gap-2">
-        <a href="profile.html?userId=${post.userId}" class="post-avatar-link" style="text-decoration:none;">
-          ${avatarHtml}
-        </a>
+  <div class="d-flex gap-2">
+    <a href="profile.html?userId=${post.userId}" class="post-avatar-link" style="text-decoration:none;">
+      ${avatarHtml}
+    </a>
 
-        <div class="flex-grow-1">
-          <div class="d-flex justify-content-between">
-            <div>
-              <a href="profile.html?userId=${post.userId}" class="post-username-link">
-                <span class="post-username">${escapeHtml(
-                  author.name || post.name || "Unknown"
-                )}</span>
-              </a>
-            </div>
+    <div class="flex-grow-1">
+      <div class="d-flex justify-content-between">
+        <div>
+          <a href="profile.html?userId=${post.userId}" class="post-username-link">
+            <span class="post-username">${escapeHtml(
+              author.name || post.name || "Unknown"
+            )}</span>
+          </a>
+        </div>
 
-            <span class="post-meta">${when} · ${escapeHtml(visibility)}</span>
-          </div>
-
-          <div class="post-body">
-            ${escapeHtml(post.body || "")}
-          </div>
-
-          <div class="post-actions">
-            <button
-              type="button"
-              class="like-btn"
-              data-liked="${userHasLiked}"
-              data-count="${likes}"
-            >
-              <span class="heart-icon">${userHasLiked ? "♥" : "♡"}</span>
-              <span class="like-count">${likes}</span>
-            </button>
-
-            <button type="button" class="comment-btn" data-post-id="${post.id}">
-              <i>💬</i>
-              <span class="comment-count">${commentCount}</span>
-            </button>
-
-            <button type="button">
-              <i>↻</i> Share
-            </button>
-          </div>
-
-
-          <div class="post-comments mt-2" data-comments-for="${post.id}" hidden>
-            <div class="comment-list mb-2"></div>
-            <form class="comment-form">
-              <div class="d-flex gap-2 mb-1">
-                <input
-                  type="text"
-                  class="form-control form-control-sm comment-input"
-                  placeholder="Write a comment…"
-                />
-                <button type="submit" class="btn btn-outline-soft btn-sm">
-                  Comment
-                </button>
-              </div>
-              <input
-                type="file"
-                class="form-control form-control-sm comment-image-input"
-                accept="image/*"
-              />
-            </form>
-          </div>
+        <div class="d-flex align-items-center gap-2">
+          ${
+            isOwnPost
+              ? `<button
+                   type="button"
+                   class="btn btn-link btn-sm text-danger p-0 delete-post-btn"
+                   data-post-id="${post.id}"
+                 >
+                   Delete
+                 </button>`
+              : ""
+          }
+          <span class="post-meta">${when} · ${escapeHtml(visibility)}</span>
         </div>
       </div>
-    `;
+
+      <div class="post-body">
+        ${escapeHtml(post.body || "")}
+      </div>
+
+      <div class="post-actions">
+        <button
+          type="button"
+          class="like-btn"
+          data-liked="${userHasLiked}"
+          data-count="${likes}"
+        >
+          <span class="heart-icon">${userHasLiked ? "♥" : "♡"}</span>
+          <span class="like-count">${likes}</span>
+        </button>
+
+        <button type="button" class="comment-btn" data-post-id="${post.id}">
+          <i>💬</i>
+          <span class="comment-count">${commentCount}</span>
+        </button>
+
+        <button type="button">
+          <i>↻</i> Share
+        </button>
+      </div>
+
+      <div class="post-comments mt-2" data-comments-for="${post.id}" hidden>
+        <div class="comment-list mb-2"></div>
+        <form class="comment-form">
+          <div class="d-flex gap-2 mb-1">
+            <input
+              type="text"
+              class="form-control form-control-sm comment-input"
+              placeholder="Write a comment…"
+            />
+            <button type="submit" class="btn btn-outline-soft btn-sm">
+              Comment
+            </button>
+          </div>
+          <input
+            type="file"
+            class="form-control form-control-sm comment-image-input"
+            accept="image/*"
+          />
+        </form>
+      </div>
+    </div>
+  </div>
+`;
 
     container.appendChild(article);
   });
@@ -1142,6 +1156,87 @@ if (composerButtonEl && composerInputEl) {
     }
   });
 }
+
+// ===========================
+//  DELETE POST (only author)
+// ===========================
+document.addEventListener("click", async function (e) {
+  const btn = e.target.closest(".delete-post-btn");
+  if (!btn) return;
+
+  const user = getCurrentUser();
+  if (!user) {
+    const loginModalEl = document.getElementById("loginModal");
+    if (loginModalEl && typeof bootstrap !== "undefined") {
+      const modalInstance =
+        bootstrap.Modal.getInstance(loginModalEl) ||
+        new bootstrap.Modal(loginModalEl);
+      modalInstance.show();
+    } else {
+      alert("Log in to delete your posts.");
+    }
+    return;
+  }
+
+  const postId = Number(btn.getAttribute("data-post-id"));
+  if (!postId) return;
+
+  const posts = loadPosts();
+  const post = posts.find((p) => p.id === postId);
+  if (!post) return;
+
+  if (post.userId !== user.id) {
+    alert("You can only delete your own posts.");
+    return;
+  }
+
+  if (!confirm("Delete this post? This cannot be undone.")) return;
+
+  // 🔹 1) Remove post from localStorage
+  const updatedPosts = posts.filter((p) => p.id !== postId);
+  savePosts(updatedPosts);
+
+  // 🔹 2) Remove related comments from localStorage
+  const commentsMap = loadCommentsMap();
+  delete commentsMap[String(postId)];
+  saveCommentsMap(commentsMap);
+
+  // 🔹 3) Remove this post from likes map (so no stale likes)
+  const likesMap = loadLikes();
+  Object.keys(likesMap).forEach((uid) => {
+    const list = likesMap[uid];
+    if (Array.isArray(list)) {
+      likesMap[uid] = list.filter((id) => id !== postId);
+    }
+  });
+  saveLikes(likesMap);
+
+  // 🔹 4) Delete from Firestore: post + its comments
+  try {
+    // Delete the post doc
+    await deleteDoc(doc(postsCol, String(postId)));
+  } catch (err) {
+    console.error("Error deleting post from Firestore:", err);
+  }
+
+  try {
+    // Delete all comments tied to this post
+    const q = query(commentsCol, where("postId", "==", postId));
+    const snap = await getDocs(q);
+    const deletionPromises = snap.docs.map((d) =>
+      deleteDoc(doc(commentsCol, d.id))
+    );
+    await Promise.all(deletionPromises);
+  } catch (err) {
+    console.error("Error deleting comments for post:", err);
+  }
+
+  // 🔹 5) Re-render UI pieces
+  renderPosts();
+  renderPopularTopics();
+  renderActiveTopicBar();
+  renderPeopleToFollow();
+});
 
 // ===========================
 //  SIGNUP HANDLER (Firestored)
