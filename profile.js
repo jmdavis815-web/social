@@ -99,6 +99,39 @@ function saveLikes(map) {
   localStorage.setItem(LIKES_KEY, JSON.stringify(map));
 }// 👈 add this
 
+// Returns an array of postIds this user has liked
+function getUserLikedPostIds(userId) {
+  if (!userId) return [];
+  const map = loadLikes();
+  const entry = map[String(userId)];
+  return Array.isArray(entry) ? entry : [];
+}
+
+function hasUserLikedPost(userId, postId) {
+  if (!userId || !postId) return false;
+  const likedIds = getUserLikedPostIds(userId);
+  return likedIds.includes(postId);
+}
+
+// Set or clear a like for (userId, postId)
+function setUserLike(userId, postId, liked) {
+  if (!userId || !postId) return;
+
+  const map = loadLikes();
+  const key = String(userId);
+  let list = Array.isArray(map[key]) ? map[key] : [];
+
+  const idx = list.indexOf(postId);
+  if (liked) {
+    if (idx === -1) list.push(postId);
+  } else {
+    if (idx !== -1) list.splice(idx, 1);
+  }
+
+  map[key] = list;
+  saveLikes(map);
+}
+
 // Follows: followerId -> [followedUserId, ...] (local cache)
 const FOLLOWS_KEY = "openwall-follows";
 
@@ -763,196 +796,308 @@ function renderCommentsForPost(postId, commentsSection) {
 // ===========================
 //  RENDER PROFILE POSTS
 // ===========================
-function renderProfilePosts(user, isOwnProfile) {
-  const postsContainer = document.getElementById("profilePosts");
-  if (!postsContainer) return;
+function renderProfilePosts(profileUser, isOwnProfile) {
+  const card = document.getElementById("profilePosts");
+  if (!card || !profileUser) return;
 
-  const allPosts = loadPosts()
-    .slice()
+  const allPosts = loadPosts();
+  const posts = allPosts
+    .filter((p) => p.userId === profileUser.id)
     .sort((a, b) => b.createdAt - a.createdAt);
 
-  const followingIds = isOwnProfile ? getFollowingIds(user.id) : [];
+  const currentUser = getCurrentUser();
 
-  const visiblePosts = allPosts.filter((p) => {
-    if (isOwnProfile) {
-      return p.userId === user.id || followingIds.includes(p.userId);
-    }
-    return p.userId === user.id;
-  });
+  const avatarUrl = profileUser.avatarDataUrl || profileUser.avatar || null;
+  const initials =
+    (profileUser.name || "U")
+      .split(" ")
+      .filter(Boolean)
+      .map((n) => n[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase() || "U";
 
-  const commentsMap = loadCommentsMap();
-
-    postsContainer.innerHTML = `
-    <div class="card-body">
-      <div class="d-flex justify-content-between align-items-center mb-2">
-        <h2 class="h6 mb-0">Posts</h2>
-      </div>
-
+  const avatarInner = `
+    <a href="profile.html?userId=${profileUser.id}" class="avatar-link">
       ${
-        isOwnProfile
-          ? `
-      <div class="mb-3" id="profileComposer">
-        <textarea
-          id="profileComposerInput"
-          class="form-control form-control-sm"
-          rows="2"
-          placeholder="Share something on your wall…"
-        ></textarea>
-        <div class="d-flex justify-content-between align-items-center mt-1">
-          <small class="text-body-secondary">
-            Posts you share here will appear on your wall and the main feed.
-          </small>
-          <button
-            id="profileComposerBtn"
-            type="button"
-            class="btn btn-main btn-sm"
-          >
-            Post
-          </button>
-        </div>
-      </div>
-          `
-          : ""
+        avatarUrl
+          ? `<img src="${escapeHtml(avatarUrl)}" alt="${escapeHtml(
+              profileUser.name || "Avatar"
+            )}" class="post-avatar-img" />`
+          : `<div class="post-avatar-fallback">${escapeHtml(initials)}</div>`
       }
+    </a>
+  `;
 
-      <div id="profilePostList"></div>
+  let html = `<div class="card-body">`;
+
+  // Header row
+  html += `
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <h3 class="h6 mb-0">Posts</h3>
+      <span class="text-body-secondary small">
+        ${posts.length} post${posts.length === 1 ? "" : "s"}
+      </span>
     </div>
   `;
 
-  const listEl = postsContainer.querySelector("#profilePostList");
-
-    // Wire up the composer after posts render
+  // Composer if it's the owner's profile
   if (isOwnProfile) {
-    setupProfileComposer(user);
-  }
-
-  if (!visiblePosts.length) {
-    const empty = document.createElement("div");
-    empty.className = "text-body-secondary small";
-    empty.textContent = isOwnProfile
-      ? "You and the people you follow haven't posted anything yet."
-      : "This user hasn't posted anything yet.";
-    listEl.appendChild(empty);
-    return;
-  }
-
-  const users = loadUsers();
-
-    visiblePosts.forEach((post) => {
-    const author = users.find((u) => u.id === post.userId) || user;
-
-    const initials = getInitials(author.name || post.name);
-    const avatarUrl = getAvatarUrlForUser(author);
-    const avatarInner = avatarUrl
-      ? `<img src="${avatarUrl}" alt="${escapeHtml(
-          author.name || "Avatar"
-        )}" style="width:100%;height:100%;object-fit:cover;" />`
-      : escapeHtml(initials);
-
-    const when = timeAgo(post.createdAt || Date.now());
-    const visibility = post.visibility || "Public";
-    const likes = post.likes ?? 0;
-    const commentCount = (commentsMap[String(post.id)] || []).length;
-
-    const article = document.createElement("article");
-    article.className = "post-card mb-2";
-    article.dataset.postId = post.id;
-
-    const bodyHtml = escapeHtml(post.body || "").replace(/\n/g, "<br>");
-
-    const currentUser = getCurrentUser();
-    const canDelete = currentUser && currentUser.id === post.userId; // 👈
-
-        article.innerHTML = `
-      <div class="d-flex gap-2">
-        <div class="post-avatar">
-          ${avatarInner}
-        </div>
-        <div class="flex-grow-1">
-          <div class="d-flex justify-content-between">
-            <div>
-              <span class="post-username">${escapeHtml(
-                post.name || author.name || "Unknown"
-              )}</span>
-              <span class="text-body-secondary small ms-1">@${escapeHtml(
-                author.username || post.username || "user"
-              )}</span>
-            </div>
-            <div class="d-flex align-items-center gap-2">
-              ${
-                canDelete
-                  ? `<button
-                       type="button"
-                       class="btn btn-link btn-sm text-danger p-0 delete-post-btn"
-                       data-post-id="${post.id}"
-                     >
-                       Delete
-                     </button>`
-                  : ""
-              }
-              <span class="post-meta">${when} · ${escapeHtml(
-                visibility
-              )}</span>
-            </div>
+    html += `
+      <div class="composer-card mb-3">
+        <div class="d-flex gap-2">
+          <div class="post-avatar">
+            ${avatarInner}
           </div>
-          <div class="post-body">
-            ${bodyHtml}
-          </div>
-          <div class="post-actions">
-            <button
-              type="button"
-              class="like-btn"
-              data-liked="false"
-              data-count="${likes}"
-            >
-              <span class="heart-icon">♡</span>
-              <span class="like-count">${likes}</span>
-            </button>
-            <button
-              type="button"
-              class="comment-btn"
-              data-post-id="${post.id}"
-            >
-              <i>💬</i>
-              <span class="comment-count">${commentCount}</span>
-            </button>
-            <button type="button">
-              <i>↻</i> Share
-            </button>
-          </div>
-
-          <div
-            class="post-comments mt-2"
-            data-comments-for="${post.id}"
-            hidden
-          >
-            <div class="comment-list mb-2"></div>
-            <form class="comment-form">
-              <div class="d-flex gap-2 mb-1">
-                <input
-                  type="text"
-                  class="form-control form-control-sm comment-input"
-                  placeholder="Write a comment…"
-                />
-                <button
-                  type="submit"
-                  class="btn btn-outline-soft btn-sm"
-                >
-                  Comment
-                </button>
-              </div>
+          <div class="flex-grow-1">
+            <textarea
+              class="form-control form-control-sm profile-composer-input"
+              rows="2"
+              placeholder="Share what's on your mind, ${escapeHtml(
+                profileUser.name || "friend"
+              )}…"
+            ></textarea>
+            <div class="d-flex gap-2 mt-1">
               <input
                 type="file"
-                class="form-control form-control-sm comment-image-input"
+                class="form-control form-control-sm profile-composer-image-input"
                 accept="image/*"
               />
-            </form>
+              <button
+                type="button"
+                class="btn btn-main btn-sm profile-composer-btn"
+              >
+                Post
+              </button>
+            </div>
+            <div class="small text-body-secondary mt-1">
+              Your posts here will also appear on the main wall.
+            </div>
           </div>
         </div>
       </div>
     `;
+  }
 
-    listEl.appendChild(article);
+  if (!posts.length) {
+    html += `
+      <div class="text-body-secondary small">
+        ${
+          isOwnProfile
+            ? "You haven't posted anything yet."
+            : "No posts from this user yet."
+        }
+      </div>
+    `;
+    html += `</div>`;
+    card.innerHTML = html;
+    if (isOwnProfile) attachProfileComposerHandlers(profileUser);
+    return;
+  }
+
+  // List of posts
+  html += `<div class="profile-post-list">`;
+
+  posts.forEach((post) => {
+    const when = timeAgo(post.createdAt || Date.now());
+    const visibility = post.visibility || "Public";
+    const likes = typeof post.likes === "number" ? post.likes : 0;
+    const commentsForPost = getCommentsForPost(post.id);
+    const commentCount = commentsForPost.length;
+    const userLiked =
+      currentUser && hasUserLikedPost(currentUser.id, post.id);
+    const canDelete = currentUser && currentUser.id === post.userId;
+    const bodyHtml = escapeHtml(post.body || "").replace(/\n/g, "<br>");
+
+    const imageHtml = post.imageDataUrl
+      ? `
+        <div class="mt-2">
+          <img
+            src="${escapeHtml(post.imageDataUrl)}"
+            alt="Post image"
+            class="post-image"
+          />
+        </div>
+      `
+      : "";
+
+    html += `
+      <article class="post-card mb-2" data-post-id="${post.id}">
+        <div class="d-flex gap-2">
+          <div class="post-avatar">
+            ${avatarInner}
+          </div>
+          <div class="flex-grow-1">
+            <div class="d-flex justify-content-between">
+              <div>
+                <span class="post-username">
+                  ${escapeHtml(profileUser.name || "Unknown")}
+                </span>
+                <span class="text-body-secondary small ms-1">
+                  @${escapeHtml(profileUser.username || "user")}
+                </span>
+              </div>
+              <div class="d-flex align-items-center gap-2">
+                ${
+                  canDelete
+                    ? `<button
+                         type="button"
+                         class="btn btn-link btn-sm text-danger p-0 delete-post-btn"
+                         data-post-id="${post.id}"
+                       >
+                         Delete
+                       </button>`
+                    : ""
+                }
+                <span class="post-meta small text-body-secondary">
+                  ${when} · ${escapeHtml(visibility)}
+                </span>
+              </div>
+            </div>
+
+            <div class="post-body">
+              ${bodyHtml}
+            </div>
+            ${imageHtml}
+
+            <div class="post-actions mt-1">
+              <button
+                type="button"
+                class="like-btn"
+                data-liked="${userLiked}"
+                data-count="${likes}"
+              >
+                <span class="heart-icon">${userLiked ? "♥" : "♡"}</span>
+                <span class="like-count">${likes}</span>
+              </button>
+
+              <button type="button" class="comment-btn">
+                💬 <span class="comment-count">${commentCount}</span>
+              </button>
+
+                <button type="button" class="share-btn">
+                  ↻ Share
+                </button>
+            </div>
+
+            <div class="post-comments mt-2" hidden>
+              <div class="comment-list mb-2"></div>
+              <form class="comment-form">
+                <div class="d-flex gap-2 mb-1">
+                  <input
+                    type="text"
+                    class="form-control form-control-sm comment-input"
+                    placeholder="Write a comment…"
+                  />
+                  <button
+                    type="submit"
+                    class="btn btn-outline-soft btn-sm"
+                  >
+                    Comment
+                  </button>
+                </div>
+                <input
+                  type="file"
+                  class="form-control form-control-sm comment-image-input"
+                  accept="image/*"
+                />
+              </form>
+            </div>
+          </div>
+        </div>
+      </article>
+    `;
+  });
+
+  html += `</div></div>`;
+  card.innerHTML = html;
+
+  if (isOwnProfile) {
+    attachProfileComposerHandlers(profileUser);
+  }
+}
+
+// ===========================
+//  PROFILE COMPOSER HANDLERS
+// ===========================
+function attachProfileComposerHandlers(profileUser) {
+  const card = document.getElementById("profilePosts");
+  if (!card) return;
+
+  const input = card.querySelector(".profile-composer-input");
+  const imageInput = card.querySelector(".profile-composer-image-input");
+  const button = card.querySelector(".profile-composer-btn");
+  if (!input || !button) return;
+
+  const handleSubmit = async () => {
+    const text = input.value.trim();
+    const hasFile = imageInput && imageInput.files && imageInput.files[0];
+
+    if (!text && !hasFile) return;
+
+    let imageDataUrl = null;
+    if (hasFile) {
+      try {
+        const file = imageInput.files[0];
+        imageDataUrl = await resizeImageTo300px(file);
+      } catch (err) {
+        console.error("Error reading post image:", err);
+        if (!text) {
+          alert(
+            "Your image couldn't be processed. Try a smaller image or add some text."
+          );
+          return;
+        }
+      }
+    }
+
+    const currentUser = getCurrentUser();
+    if (!currentUser) {
+      alert("Log in to post.");
+      return;
+    }
+
+    const posts = loadPosts();
+    const now = Date.now();
+
+    const newPost = {
+      id: now,
+      userId: currentUser.id,
+      name: currentUser.name,
+      username: currentUser.username,
+      body: text,
+      createdAt: now,
+      visibility: "Public",
+      likes: 0,
+      tags: extractTagsFromText(text),
+      imageDataUrl: imageDataUrl || null,
+    };
+
+    posts.push(newPost);
+    savePosts(posts);
+
+    try {
+      await setDoc(doc(postsCol, String(newPost.id)), newPost);
+    } catch (err) {
+      console.error("Error writing profile post to Firestore:", err);
+    }
+
+    input.value = "";
+    if (imageInput) {
+      imageInput.value = "";
+    }
+
+    // Re-render posts (composer will be recreated + handlers reattached)
+    renderProfilePosts(profileUser, true);
+  };
+
+  button.addEventListener("click", handleSubmit);
+
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmit();
+    }
   });
 }
 
@@ -1185,7 +1330,7 @@ function renderProfile() {
 //  LIKE / COMMENT HANDLERS
 // ===========================
 
-// Like toggle (profile posts)
+// Like toggle (profile posts, per-user)
 document.addEventListener("click", async function (e) {
   const btn = e.target.closest(".like-btn");
   if (!btn) return;
@@ -1193,25 +1338,38 @@ document.addEventListener("click", async function (e) {
   // Only handle likes inside profilePosts card
   if (!btn.closest("#profilePosts")) return;
 
-  let liked = btn.getAttribute("data-liked") === "true";
+  const currentUser = getCurrentUser();
+  if (!currentUser) {
+    alert("Log in to like posts.");
+    return;
+  }
+
+  const article = btn.closest(".post-card");
+  if (!article || !article.dataset.postId) return;
+  const postId = Number(article.dataset.postId);
+
   let count = parseInt(btn.getAttribute("data-count"), 10) || 0;
 
-  liked = !liked;
-  btn.setAttribute("data-liked", liked);
+  // Check existing like state for THIS user + THIS post
+  const alreadyLiked = hasUserLikedPost(currentUser.id, postId);
+  const nowLiked = !alreadyLiked;
 
-  count = liked ? count + 1 : Math.max(0, count - 1);
+  // Update local like map
+  setUserLike(currentUser.id, postId, nowLiked);
+
+  // Update count
+  count = nowLiked ? count + 1 : Math.max(0, count - 1);
+
+  // Update button UI
+  btn.setAttribute("data-liked", nowLiked);
   btn.setAttribute("data-count", count);
 
   const heartEl = btn.querySelector(".heart-icon");
   const countEl = btn.querySelector(".like-count");
-
-  if (heartEl) heartEl.textContent = liked ? "♥" : "♡";
+  if (heartEl) heartEl.textContent = nowLiked ? "♥" : "♡";
   if (countEl) countEl.textContent = count;
 
-  const article = btn.closest(".post-card");
-  if (!article || !article.dataset.postId) return;
-
-  const postId = Number(article.dataset.postId);
+  // Update local posts array + Firestore
   const posts = loadPosts();
   const index = posts.findIndex((p) => p.id === postId);
   if (index !== -1) {
@@ -1219,7 +1377,6 @@ document.addEventListener("click", async function (e) {
     savePosts(posts);
   }
 
-  // 🔹 Update Firestore likes
   try {
     await updateDoc(doc(postsCol, String(postId)), { likes: count });
   } catch (err) {
@@ -1340,6 +1497,109 @@ if (hasFile) {
     let currentCount = parseInt(countEl.textContent || "0", 10) || 0;
     currentCount += 1;
     countEl.textContent = currentCount;
+  }
+});
+
+// ===========================
+//  SHARE BUTTON — REPOST WITH COMMENT (Profile page)
+// ===========================
+document.addEventListener("click", async function (e) {
+  const btn = e.target.closest(".share-btn");
+  if (!btn) return;
+
+  // Only handle shares inside the profile posts card
+  if (!btn.closest("#profilePosts")) return;
+
+  const currentUser = getCurrentUser();
+  if (!currentUser) {
+    alert("Log in to share posts.");
+    return;
+  }
+
+  const article = btn.closest(".post-card");
+  if (!article || !article.dataset.postId) return;
+
+  const postId = Number(article.dataset.postId);
+
+  const posts = loadPosts();
+  const original = posts.find((p) => p.id === postId);
+  if (!original) {
+    console.warn("Original post not found for share:", postId);
+    alert("That post could not be found to share.");
+    return;
+  }
+
+  // Ask the user for an optional comment
+  const commentText = window.prompt(
+    "Add a comment to share this post (optional):",
+    ""
+  );
+
+  // If they cancelled the prompt, do nothing
+  if (commentText === null) {
+    return;
+  }
+
+  const trimmedComment = commentText.trim();
+
+  // Build the new post body (your comment + original content)
+  const sharedFromHandle = original.username || "user";
+  const originalBody = original.body || "";
+
+  let combinedBody;
+  if (trimmedComment) {
+    combinedBody =
+      `${trimmedComment}\n\n` +
+      `🔁 Shared from @${sharedFromHandle}:\n` +
+      originalBody;
+  } else {
+    combinedBody = `🔁 Shared from @${sharedFromHandle}:\n${originalBody}`;
+  }
+
+  const now = Date.now();
+
+  const newPost = {
+    id: now,
+    userId: currentUser.id,
+    name: currentUser.name,
+    username: currentUser.username,
+    body: combinedBody,
+    createdAt: now,
+    visibility: "Public",
+    likes: 0,
+    tags: extractTagsFromText(combinedBody),
+    imageDataUrl: original.imageDataUrl || null,
+    // Optional: metadata about the original
+    sharedFromPostId: original.id,
+    sharedFromUserId: original.userId,
+  };
+
+  // Save locally
+  posts.push(newPost);
+  savePosts(posts);
+
+  // Save to Firestore
+  try {
+    await setDoc(doc(postsCol, String(newPost.id)), newPost);
+  } catch (err) {
+    console.error("Error writing shared post to Firestore:", err);
+  }
+
+  // Re-render profile so stats/topics update.
+  const profileUser = getProfileUser();
+  if (profileUser) {
+    const isOwnProfile = currentUser.id === profileUser.id;
+    renderProfileHeader(profileUser, isOwnProfile);
+    renderProfileAbout(profileUser);
+    renderProfileTopics(profileUser);
+    renderProfilePosts(profileUser, isOwnProfile);
+  }
+
+  // Optional: small feedback
+  if (typeof showToastSuccess === "function") {
+    showToastSuccess("Post shared to your wall.");
+  } else {
+    console.log("Shared post created:", newPost.id);
   }
 });
 

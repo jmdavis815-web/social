@@ -202,6 +202,7 @@ if (themeToggle) {
 //  SIMPLE AUTH HELPERS
 // ===========================
 let activeTopic = null; // current hashtag filter
+let activeFeedFilter = "following"; // "following" | "all"
 
 function extractTagsFromText(text) {
   if (!text) return [];
@@ -645,6 +646,24 @@ function renderPosts() {
     });
   }
 
+  // 🔹 Apply "Following" vs "All" feed filter
+  const currentUser = getCurrentUser();
+  if (!currentUser) {
+    // If not logged in, always show ALL
+    activeFeedFilter = "all";
+  }
+
+  if (activeFeedFilter === "following" && currentUser) {
+    const followingIds = getFollowingIds(currentUser.id);
+
+    posts = posts.filter((p) => {
+      // Always show your own posts
+      if (p.userId === currentUser.id) return true;
+      // Otherwise only posts from people you follow
+      return followingIds.includes(p.userId);
+    });
+  }
+
   container.innerHTML = "";
 
   if (!posts.length) {
@@ -652,13 +671,14 @@ function renderPosts() {
     empty.className = "text-body-secondary small";
     empty.textContent = activeTopic
       ? `No posts found for #${activeTopic} yet.`
+      : activeFeedFilter === "following"
+      ? "No posts from people you follow yet. Try the All tab."
       : "No posts yet. Be the first to post!";
     container.appendChild(empty);
     return;
   }
 
   const users = loadUsers();
-  const currentUser = getCurrentUser();
 
   posts.forEach((post) => {
     const author =
@@ -678,18 +698,18 @@ function renderPosts() {
 
     const avatarUrl = author.avatarDataUrl || author.avatar || null;
     const avatarInner = `
-  <a href="profile.html?userId=${author.id}" class="avatar-link">
-    ${
-      avatarUrl
-        ? `<img
-             src="${escapeHtml(avatarUrl)}"
-             alt="${escapeHtml(author.name || "Avatar")}"
-             class="post-avatar-img"
-           />`
-        : `<div class="post-avatar-fallback">${escapeHtml(initials)}</div>`
-    }
-  </a>
-`;
+      <a href="profile.html?userId=${author.id}" class="avatar-link">
+        ${
+          avatarUrl
+            ? `<img
+                 src="${escapeHtml(avatarUrl)}"
+                 alt="${escapeHtml(author.name || "Avatar")}"
+                 class="post-avatar-img"
+               />`
+            : `<div class="post-avatar-fallback">${escapeHtml(initials)}</div>`
+        }
+      </a>
+    `;
 
     const when = timeAgo(post.createdAt || Date.now());
     const visibility = post.visibility || "Public";
@@ -704,16 +724,16 @@ function renderPosts() {
     const bodyHtml = escapeHtml(post.body || "").replace(/\n/g, "<br>");
 
     const postImageHtml = post.imageDataUrl
-  ? `
-    <div class="post-image mt-2">
-      <img
-        src="${escapeHtml(post.imageDataUrl)}"
-        alt="Post image"
-        class="post-image-img"
-      />
-    </div>
-  `
-  : "";
+      ? `
+        <div class="post-image mt-2">
+          <img
+            src="${escapeHtml(post.imageDataUrl)}"
+            alt="Post image"
+            class="post-image-img"
+          />
+        </div>
+      `
+      : "";
 
     const article = document.createElement("article");
     article.className = "post-card mb-2";
@@ -759,28 +779,28 @@ function renderPosts() {
           </div>
 
           <div class="post-actions mt-1">
-  <button
-    type="button"
-    class="like-btn"
-    data-liked="${userLiked}"
-    data-count="${likes}"
-  >
-    <span class="heart-icon">${userLiked ? "♥" : "♡"}</span>
-    <span class="like-count">${likes}</span>
-  </button>
+            <button
+              type="button"
+              class="like-btn"
+              data-liked="${userLiked}"
+              data-count="${likes}"
+            >
+              <span class="heart-icon">${userLiked ? "♥" : "♡"}</span>
+              <span class="like-count">${likes}</span>
+            </button>
 
-  <button type="button" class="comment-btn">
-    💬 <span class="comment-count">${commentCount}</span>
-  </button>
+            <button type="button" class="comment-btn">
+              💬 <span class="comment-count">${commentCount}</span>
+            </button>
 
-  <button
-    type="button"
-    class="share-btn"
-    data-post-id="${post.id}"
-  >
-    ↻ Share
-  </button>
-</div>
+            <button
+              type="button"
+              class="share-btn"
+              data-post-id="${post.id}"
+            >
+              ↻ Share
+            </button>
+          </div>
 
           <div class="post-comments mt-2" hidden>
             <div class="comment-list mb-2"></div>
@@ -823,13 +843,17 @@ function renderCommentsForPost(postId, commentsSection) {
   const comments = getCommentsForPost(postId);
   listEl.innerHTML = "";
 
-  if (!comments.length) {
-    const empty = document.createElement("div");
-    empty.className = "text-body-secondary small";
-    empty.textContent = "No comments yet. Be the first to reply.";
-    listEl.appendChild(empty);
-    return;
-  }
+  if (!posts.length) {
+  const empty = document.createElement("div");
+  empty.className = "text-body-secondary small";
+  empty.textContent = activeTopic
+    ? `No posts found for #${activeTopic} yet.`
+    : activeFeedFilter === "following"
+    ? "No posts from people you follow yet. Try the All tab."
+    : "No posts yet. Be the first to post!";
+  container.appendChild(empty);
+  return;
+}
 
   const posts = loadPosts();
   const post = posts.find((p) => p.id === postId);
@@ -1062,11 +1086,65 @@ async function syncCommentsFromFirestore() {
 //  INIT POSTS
 // ===========================
 function initPosts() {
+  renderFeedFilterBar();
   renderPosts();
   renderPopularTopics();
   renderActiveTopicBar();
   renderPeopleToFollow();
 }
+
+function renderFeedFilterBar() {
+  const bar = document.getElementById("feedFilterBar");
+  if (!bar) return;
+
+  const btnFollowing = document.getElementById("feedFilterFollowing");
+  const btnAll = document.getElementById("feedFilterAll");
+  const currentUser = getCurrentUser();
+
+  // If not logged in, force All
+  if (!currentUser) {
+    activeFeedFilter = "all";
+  }
+
+  if (btnFollowing) {
+    const isActive = activeFeedFilter === "following" && !!currentUser;
+    btnFollowing.classList.toggle("btn-main", isActive);
+    btnFollowing.classList.toggle("btn-outline-soft", !isActive);
+    btnFollowing.disabled = !currentUser; // can't use Following if logged out
+  }
+
+  if (btnAll) {
+    const isActive = activeFeedFilter === "all" || !currentUser;
+    btnAll.classList.toggle("btn-main", isActive);
+    btnAll.classList.toggle("btn-outline-soft", !isActive);
+  }
+}
+
+document.addEventListener("click", function (e) {
+  const followBtn = e.target.closest("#feedFilterFollowing");
+  const allBtn = e.target.closest("#feedFilterAll");
+
+  if (!followBtn && !allBtn) return;
+
+  const currentUser = getCurrentUser();
+  if (!currentUser && followBtn) {
+    alert("Log in to see your Following feed.");
+    return;
+  }
+
+  if (followBtn) {
+    activeFeedFilter = "following";
+  }
+  if (allBtn) {
+    activeFeedFilter = "all";
+  }
+
+  renderFeedFilterBar();
+  renderPosts();
+  renderActiveTopicBar();
+  renderPopularTopics();
+  renderPeopleToFollow();
+});
 
 // ===========================
 //  AUTH UI UPDATES
@@ -1165,6 +1243,7 @@ function updateAuthUI() {
       composerButton.setAttribute("data-bs-target", "#loginModal");
     }
   }
+    renderFeedFilterBar();
 }
 
 // ===========================
@@ -1500,48 +1579,108 @@ if (loginForm) {
 // ===========================
 //  SHARE BUTTON (copy link / Web Share API)
 // ===========================
+// ===========================
+//  SHARE BUTTON — REPOST WITH COMMENT (like Facebook)
+// ===========================
 document.addEventListener("click", async function (e) {
   const btn = e.target.closest(".share-btn");
   if (!btn) return;
+
+  const currentUser = getCurrentUser();
+  if (!currentUser) {
+    const loginModalEl = document.getElementById("loginModal");
+    if (loginModalEl && typeof bootstrap !== "undefined") {
+      const modalInstance =
+        bootstrap.Modal.getInstance(loginModalEl) ||
+        new bootstrap.Modal(loginModalEl);
+      modalInstance.show();
+    } else {
+      alert("Log in to share posts.");
+    }
+    return;
+  }
 
   const article = btn.closest(".post-card");
   if (!article || !article.dataset.postId) return;
 
   const postId = Number(article.dataset.postId);
 
-  // Make sure the comments panel is open when you share from here
-  const commentsSection = article.querySelector(".post-comments");
-  if (commentsSection) {
-    commentsSection.removeAttribute("hidden");
+  const posts = loadPosts();
+  const original = posts.find((p) => p.id === postId);
+  if (!original) {
+    console.warn("Original post not found for share:", postId);
+    alert("That post could not be found to share.");
+    return;
   }
 
-  // Build a simple permalink to this post
-  const baseUrl = `${window.location.origin}${window.location.pathname}`;
-  const url = `${baseUrl}?postId=${postId}#post-${postId}`;
+  // Ask the user for an optional comment
+  const commentText = window.prompt(
+    "Add a comment to share this post (optional):",
+    ""
+  );
 
-  const postBodyEl = article.querySelector(".post-body");
-  const textSnippet = postBodyEl
-    ? postBodyEl.textContent.trim().slice(0, 140)
-    : "Check out this post on OpenWall";
+  // If they cancelled the prompt, do nothing
+  if (commentText === null) {
+    return;
+  }
 
+  const trimmedComment = commentText.trim();
+
+  // Build the new post body (your comment + original content)
+  const sharedFromHandle = original.username || "user";
+  const originalBody = original.body || "";
+
+  let combinedBody;
+  if (trimmedComment) {
+    combinedBody =
+      `${trimmedComment}\n\n` +
+      `🔁 Shared from @${sharedFromHandle}:\n` +
+      originalBody;
+  } else {
+    combinedBody = `🔁 Shared from @${sharedFromHandle}:\n${originalBody}`;
+  }
+
+  const now = Date.now();
+
+  const newPost = {
+    id: now,
+    userId: currentUser.id,
+    name: currentUser.name,
+    username: currentUser.username,
+    body: combinedBody,
+    createdAt: now,
+    visibility: "Public",
+    likes: 0,
+    // include both your new hashtags and any from the original post
+    tags: extractTagsFromText(combinedBody),
+    // carry over the original image if it had one
+    imageDataUrl: original.imageDataUrl || null,
+    // optional: track what it was shared from
+    sharedFromPostId: original.id,
+    sharedFromUserId: original.userId,
+  };
+
+  // Save locally
+  posts.push(newPost);
+  savePosts(posts);
+
+  // Save to Firestore
   try {
-    if (navigator.share) {
-      // Mobile / modern browsers
-      await navigator.share({
-        title: "OpenWall post",
-        text: textSnippet,
-        url,
-      });
-    } else if (navigator.clipboard && navigator.clipboard.writeText) {
-      // Fallback: copy link
-      await navigator.clipboard.writeText(url);
-      alert("Link copied to your clipboard!");
-    } else {
-      // Old-school fallback
-      prompt("Copy this link:", url);
-    }
+    await setDoc(doc(postsCol, String(newPost.id)), newPost);
   } catch (err) {
-    console.error("Error sharing post:", err);
+    console.error("Error writing shared post to Firestore:", err);
+  }
+
+  // Re-render wall + sidebars
+  renderPosts();
+  renderPopularTopics();
+  renderActiveTopicBar();
+  renderPeopleToFollow();
+
+  // Optionally scroll to top so they see their shared post
+  const feed = document.getElementById("postList");
+  if (feed) {
+    feed.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 });
 
