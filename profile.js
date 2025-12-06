@@ -691,6 +691,11 @@ function renderCommentsForPost(postId, commentsSection) {
     return;
   }
 
+  // We need the post to know who owns it
+  const posts = loadPosts();
+  const post = posts.find((p) => p.id === postId);
+  const currentUser = getCurrentUser();
+
   comments
     .slice()
     .sort((a, b) => a.createdAt - b.createdAt)
@@ -698,6 +703,28 @@ function renderCommentsForPost(postId, commentsSection) {
       const item = document.createElement("div");
       item.className = "comment-item small";
       const when = timeAgo(c.createdAt || Date.now());
+
+      // Can delete if:
+      //  - you're the post owner, OR
+      //  - you're the comment author
+      const canDelete =
+        currentUser &&
+        (currentUser.id === c.userId ||
+          (post && currentUser.id === post.userId));
+
+      const deleteBtnHtml = canDelete
+        ? `
+        <button
+          type="button"
+          class="btn btn-link btn-sm text-danger p-0 ms-2 delete-comment-btn"
+          data-comment-id="${c.id}"
+          data-post-id="${postId}"
+          data-comment-user-id="${c.userId}"
+        >
+          Delete
+        </button>
+      `
+        : "";
 
       const imageHtml = c.imageDataUrl
         ? `
@@ -712,14 +739,17 @@ function renderCommentsForPost(postId, commentsSection) {
         : "";
 
       item.innerHTML = `
-      <div class="d-flex justify-content-between">
+      <div class="d-flex justify-content-between align-items-center">
         <div>
           <strong>${escapeHtml(c.name || "Unknown")}</strong>
           <span class="text-body-secondary ms-1">@${escapeHtml(
             c.username || "user"
           )}</span>
         </div>
-        <span class="text-body-secondary">${when}</span>
+        <div class="d-flex align-items-center">
+          <span class="text-body-secondary small">${when}</span>
+          ${deleteBtnHtml}
+        </div>
       </div>
       <div class="comment-body">
         ${escapeHtml(c.body || "")}
@@ -1493,6 +1523,74 @@ document.addEventListener("click", async function (e) {
     renderProfileAbout(profileUser);
     renderProfileTopics(profileUser);
     renderProfilePosts(profileUser, isOwnProfile);
+  }
+});
+
+// ===========================
+//  DELETE COMMENT (Profile page)
+// ===========================
+document.addEventListener("click", async function (e) {
+  const btn = e.target.closest(".delete-comment-btn");
+  if (!btn) return;
+
+  // Only handle deletes inside the profile posts card
+  if (!btn.closest("#profilePosts")) return;
+
+  const currentUser = getCurrentUser();
+  if (!currentUser) {
+    alert("Log in to delete comments.");
+    return;
+  }
+
+  const commentId = Number(btn.getAttribute("data-comment-id"));
+  const postId = Number(btn.getAttribute("data-post-id"));
+  const commentUserId = Number(btn.getAttribute("data-comment-user-id"));
+
+  if (!commentId || !postId) return;
+
+  // Find post to see who owns it
+  const posts = loadPosts();
+  const post = posts.find((p) => p.id === postId);
+  if (!post) return;
+
+  const isPostOwner = currentUser.id === post.userId;
+  const isCommentOwner = currentUser.id === commentUserId;
+
+  if (!isPostOwner && !isCommentOwner) {
+    alert("You can only delete your own comments or comments on your posts.");
+    return;
+  }
+
+  if (!confirm("Delete this comment? This cannot be undone.")) return;
+
+  // 1) Remove from local comments map
+  const commentsMap = loadCommentsMap();
+  const key = String(postId);
+  const list = Array.isArray(commentsMap[key]) ? commentsMap[key] : [];
+  commentsMap[key] = list.filter((c) => c.id !== commentId);
+  saveCommentsMap(commentsMap);
+
+  // 2) Delete from Firestore
+  try {
+    await deleteDoc(doc(commentsCol, String(commentId)));
+  } catch (err) {
+    console.error("Error deleting comment from Firestore:", err);
+  }
+
+  // 3) Re-render comments for this post
+  const article = btn.closest(".post-card");
+  if (article) {
+    const commentsSection = article.querySelector(".post-comments");
+    if (commentsSection) {
+      renderCommentsForPost(postId, commentsSection);
+    }
+
+    // 4) Update comment count badge
+    const countEl = article.querySelector(".comment-btn .comment-count");
+    if (countEl) {
+      const updatedList = commentsMap[key] || [];
+      countEl.textContent = updatedList.length.toString();
+    }
   }
 });
 

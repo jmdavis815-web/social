@@ -556,16 +556,20 @@ function renderPeopleToFollow() {
         .toUpperCase() || "U";
 
     const avatarHtml = u.avatarUrl
-      ? `
-        <div class="mini-avatar">
-          <img
-            src="${escapeHtml(u.avatarUrl)}"
-            alt="${escapeHtml(initials)}"
-            class="post-avatar-img"
-          />
-        </div>
-      `
-      : `<div class="mini-avatar">${escapeHtml(initials)}</div>`;
+  ? `
+      <div class="mini-avatar">
+        <img
+          src="${escapeHtml(u.avatarUrl)}"
+          alt="${escapeHtml(initials)}"
+          class="post-avatar-img"
+        />
+      </div>
+    `
+  : `
+      <div class="mini-avatar">
+        ${escapeHtml(initials)}
+      </div>
+    `;
 
     const isCurrentFollowing =
       currentUser ? isFollowing(currentUser.id, u.userId) : false;
@@ -621,7 +625,178 @@ function renderActiveTopicBar() {
 }
 
 // ===========================
-//  RENDER COMMENTS
+//  RENDER POSTS ON MAIN WALL
+// ===========================
+function renderPosts() {
+  const container = document.getElementById("postList");
+  if (!container) return;
+
+  // Load posts & sort newest first
+  const allPosts = loadPosts()
+    .slice()
+    .sort((a, b) => b.createdAt - a.createdAt);
+
+  // Apply hashtag filter if active
+  let posts = allPosts;
+  if (activeTopic) {
+    posts = allPosts.filter((p) => {
+      const tags = (p.tags || []).map((t) => t.toLowerCase());
+      return tags.includes(activeTopic);
+    });
+  }
+
+  container.innerHTML = "";
+
+  if (!posts.length) {
+    const empty = document.createElement("div");
+    empty.className = "text-body-secondary small";
+    empty.textContent = activeTopic
+      ? `No posts found for #${activeTopic} yet.`
+      : "No posts yet. Be the first to post!";
+    container.appendChild(empty);
+    return;
+  }
+
+  const users = loadUsers();
+  const currentUser = getCurrentUser();
+
+  posts.forEach((post) => {
+    const author =
+      users.find((u) => u.id === post.userId) || {
+        name: post.name || "Unknown",
+        username: post.username || "user",
+      };
+
+    const initials =
+      (author.name || "U")
+        .split(" ")
+        .filter(Boolean)
+        .map((p) => p[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase() || "U";
+
+    const avatarUrl = author.avatarDataUrl || author.avatar || null;
+    const avatarInner = `
+  <a href="profile.html?userId=${author.id}" class="avatar-link">
+    ${
+      avatarUrl
+        ? `<img
+             src="${escapeHtml(avatarUrl)}"
+             alt="${escapeHtml(author.name || "Avatar")}"
+             class="post-avatar-img"
+           />`
+        : `<div class="post-avatar-fallback">${escapeHtml(initials)}</div>`
+    }
+  </a>
+`;
+
+    const when = timeAgo(post.createdAt || Date.now());
+    const visibility = post.visibility || "Public";
+    const likes = typeof post.likes === "number" ? post.likes : 0;
+    const commentsForPost = getCommentsForPost(post.id);
+    const commentCount = commentsForPost.length;
+    const userLiked =
+      currentUser && hasUserLikedPost(currentUser.id, post.id);
+
+    const canDelete = currentUser && currentUser.id === post.userId;
+
+    const bodyHtml = escapeHtml(post.body || "").replace(/\n/g, "<br>");
+
+    const article = document.createElement("article");
+    article.className = "post-card mb-2";
+    article.dataset.postId = post.id;
+
+    article.innerHTML = `
+      <div class="d-flex gap-2">
+        <div class="post-avatar">
+          ${avatarInner}
+        </div>
+        <div class="flex-grow-1">
+          <div class="d-flex justify-content-between">
+            <div>
+              <span class="post-username">
+                ${escapeHtml(author.name || "Unknown")}
+              </span>
+              <span class="text-body-secondary small ms-1">
+                @${escapeHtml(author.username || "user")}
+              </span>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+              ${
+                canDelete
+                  ? `<button
+                       type="button"
+                       class="btn btn-link btn-sm text-danger p-0 delete-post-btn"
+                       data-post-id="${post.id}"
+                     >
+                       Delete
+                     </button>`
+                  : ""
+              }
+              <span class="post-meta small text-body-secondary">
+                ${when} · ${escapeHtml(visibility)}
+              </span>
+            </div>
+          </div>
+
+          <div class="post-body">
+            ${bodyHtml}
+          </div>
+
+          <div class="post-actions mt-1">
+            <button
+              type="button"
+              class="like-btn"
+              data-liked="${userLiked}"
+              data-count="${likes}"
+            >
+              <span class="heart-icon">${userLiked ? "♥" : "♡"}</span>
+              <span class="like-count">${likes}</span>
+            </button>
+
+            <button type="button" class="comment-btn">
+              💬 <span class="comment-count">${commentCount}</span>
+            </button>
+
+            <button type="button">
+              ↻ Share
+            </button>
+          </div>
+
+          <div class="post-comments mt-2" hidden>
+            <div class="comment-list mb-2"></div>
+            <form class="comment-form">
+              <div class="d-flex gap-2 mb-1">
+                <input
+                  type="text"
+                  class="form-control form-control-sm comment-input"
+                  placeholder="Write a comment…"
+                />
+                <button
+                  type="submit"
+                  class="btn btn-outline-soft btn-sm"
+                >
+                  Comment
+                </button>
+              </div>
+              <input
+                type="file"
+                class="form-control form-control-sm comment-image-input"
+                accept="image/*"
+              />
+            </form>
+          </div>
+        </div>
+      </div>
+    `;
+
+    container.appendChild(article);
+  });
+}
+
+// ===========================
+//  RENDER POSTS
 // ===========================
 function renderCommentsForPost(postId, commentsSection) {
   const listEl = commentsSection.querySelector(".comment-list");
@@ -638,17 +813,40 @@ function renderCommentsForPost(postId, commentsSection) {
     return;
   }
 
+  const posts = loadPosts();
+  const post = posts.find((p) => p.id === postId);
+  const currentUser = getCurrentUser();
+
   comments
-    .slice()
-    .sort((a, b) => a.createdAt - b.createdAt)
-    .forEach((c) => {
-      const item = document.createElement("div");
-      item.className = "comment-item small";
+  .slice()
+  .sort((a, b) => a.createdAt - b.createdAt)
+  .forEach((c) => {
+    const item = document.createElement("div");
+    item.className = "comment-item small";
 
-      const when = timeAgo(c.createdAt || Date.now());
+    const when = timeAgo(c.createdAt || Date.now());
 
-      const imageHtml = c.imageDataUrl
-        ? `
+    const canDelete =
+      currentUser &&
+      (currentUser.id === c.userId ||
+        (post && currentUser.id === post.userId));
+
+    const deleteBtnHtml = canDelete
+      ? `
+        <button
+          type="button"
+          class="btn btn-link btn-sm text-danger p-0 ms-2 delete-comment-btn"
+          data-comment-id="${c.id}"
+          data-post-id="${postId}"
+          data-comment-user-id="${c.userId}"
+        >
+          Delete
+        </button>
+      `
+      : "";
+
+    const imageHtml = c.imageDataUrl
+      ? `
         <div class="mt-1">
           <img
             src="${escapeHtml(c.imageDataUrl)}"
@@ -657,183 +855,51 @@ function renderCommentsForPost(postId, commentsSection) {
           />
         </div>
       `
-        : "";
+      : "";
 
-      item.innerHTML = `
-      <div class="d-flex justify-content-between">
-        <div>
-          <strong>${escapeHtml(c.name || "Unknown")}</strong>
-          <span class="text-body-secondary ms-1">@${escapeHtml(
-            c.username || "user"
-          )}</span>
-        </div>
-        <span class="text-body-secondary">${when}</span>
-      </div>
-      <div class="comment-body">
-        ${escapeHtml(c.body || "")}
-      </div>
-      ${imageHtml}
-    `;
-
-      listEl.appendChild(item);
-    });
-}
-
-// ===========================
-//  RENDER POSTS
-// ===========================
-function renderPosts() {
-  const container = document.getElementById("postList");
-  if (!container) return;
-
-  const allPosts = loadPosts()
-    .slice()
-    .sort((a, b) => b.createdAt - a.createdAt);
-  const commentsMap = loadCommentsMap();
-  const users = loadUsers();
-
-  const posts = activeTopic
-    ? allPosts.filter((post) => {
-        const tags = post.tags || [];
-        return tags.includes(activeTopic);
-      })
-    : allPosts;
-
-  container.innerHTML = "";
-
-  if (!posts.length) {
-    const empty = document.createElement("div");
-    empty.className = "text-body-secondary small";
-    empty.style.padding = "0.5rem 0.25rem";
-    empty.textContent = activeTopic
-      ? `No posts found for #${activeTopic}.`
-      : "No posts yet. Be the first to share something.";
-    container.appendChild(empty);
-    return;
-  }
-
-  const currentUser = getCurrentUser();
-  const likedPostIds = currentUser ? getUserLikedPostIds(currentUser.id) : [];
-
-  posts.forEach((post) => {
-    const article = document.createElement("article");
-    article.className = "post-card";
-    article.dataset.postId = post.id;
-
-    const author = users.find((u) => u.id == post.userId) || {};
-    const initials =
-      (author.name || post.name || "")
-        .split(" ")
-        .filter(Boolean)
-        .map((n) => n[0])
-        .join("")
-        .slice(0, 2)
-        .toUpperCase() || "U";
-
-    const avatarUrl = author.avatarDataUrl || author.avatar || null;
-    const when = timeAgo(post.createdAt || Date.now());
-    const visibility = post.visibility || "Public";
-    const likes = post.likes ?? 0;
-    const commentCount = (commentsMap[String(post.id)] || []).length;
-    currentUser && likedPostIds.includes(post.id);
-    const userHasLiked = currentUser && likedPostIds.includes(post.id);
-    const isOwnPost = currentUser && currentUser.id === post.userId;
-
-
-    const avatarHtml = avatarUrl
+    // 🔹 Avatar HTML with fixed, round container
+    const avatarHtml = c.avatarDataUrl
       ? `
-        <div class="post-avatar">
+        <div class="comment-avatar">
           <img
-            src="${escapeHtml(avatarUrl)}"
-            alt="${escapeHtml(initials)}"
-            class="post-avatar-img"
+            src="${escapeHtml(c.avatarDataUrl)}"
+            alt="${escapeHtml(c.name || "Avatar")}"
           />
         </div>
       `
-      : `<div class="post-avatar">${escapeHtml(initials)}</div>`;
-
-    article.innerHTML = `
-  <div class="d-flex gap-2">
-    <a href="profile.html?userId=${post.userId}" class="post-avatar-link" style="text-decoration:none;">
-      ${avatarHtml}
-    </a>
-
-    <div class="flex-grow-1">
-      <div class="d-flex justify-content-between">
-        <div>
-          <a href="profile.html?userId=${post.userId}" class="post-username-link">
-            <span class="post-username">${escapeHtml(
-              author.name || post.name || "Unknown"
-            )}</span>
-          </a>
+      : `
+        <div class="comment-avatar comment-avatar-fallback">
+          ${escapeHtml((c.name || "U").charAt(0).toUpperCase())}
         </div>
+      `;
 
-        <div class="d-flex align-items-center gap-2">
-          ${
-            isOwnPost
-              ? `<button
-                   type="button"
-                   class="btn btn-link btn-sm text-danger p-0 delete-post-btn"
-                   data-post-id="${post.id}"
-                 >
-                   Delete
-                 </button>`
-              : ""
-          }
-          <span class="post-meta">${when} · ${escapeHtml(visibility)}</span>
-        </div>
-      </div>
+    item.innerHTML = `
+      <div class="d-flex align-items-start">
+        ${avatarHtml}
 
-      <div class="post-body">
-        ${escapeHtml(post.body || "")}
-      </div>
-
-      <div class="post-actions">
-        <button
-          type="button"
-          class="like-btn"
-          data-liked="${userHasLiked}"
-          data-count="${likes}"
-        >
-          <span class="heart-icon">${userHasLiked ? "♥" : "♡"}</span>
-          <span class="like-count">${likes}</span>
-        </button>
-
-        <button type="button" class="comment-btn" data-post-id="${post.id}">
-          <i>💬</i>
-          <span class="comment-count">${commentCount}</span>
-        </button>
-
-        <button type="button">
-          <i>↻</i> Share
-        </button>
-      </div>
-
-      <div class="post-comments mt-2" data-comments-for="${post.id}" hidden>
-        <div class="comment-list mb-2"></div>
-        <form class="comment-form">
-          <div class="d-flex gap-2 mb-1">
-            <input
-              type="text"
-              class="form-control form-control-sm comment-input"
-              placeholder="Write a comment…"
-            />
-            <button type="submit" class="btn btn-outline-soft btn-sm">
-              Comment
-            </button>
+        <div class="flex-grow-1">
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <strong>${escapeHtml(c.name || "Unknown")}</strong>
+              <span class="text-body-secondary ms-1">
+                @${escapeHtml(c.username || "user")}
+              </span>
+            </div>
+            <div class="d-flex align-items-center">
+              <span class="text-body-secondary small">${when}</span>
+              ${deleteBtnHtml}
+            </div>
           </div>
-          <input
-            type="file"
-            class="form-control form-control-sm comment-image-input"
-            accept="image/*"
-          />
-        </form>
-      </div>
-    </div>
-  </div>
-`;
 
-    container.appendChild(article);
+          <div class="comment-body">
+            ${escapeHtml(c.body || "")}
+          </div>
+          ${imageHtml}
+        </div>
+      </div>
+    `;
+
+    listEl.appendChild(item);
   });
 }
 
@@ -1524,6 +1590,78 @@ document.addEventListener("click", function (e) {
 });
 
 // ===========================
+//  DELETE COMMENT (Main feed)
+// ===========================
+document.addEventListener("click", async function (e) {
+  const btn = e.target.closest(".delete-comment-btn");
+  if (!btn) return;
+
+  const currentUser = getCurrentUser();
+  if (!currentUser) {
+    const loginModalEl = document.getElementById("loginModal");
+    if (loginModalEl && typeof bootstrap !== "undefined") {
+      const modalInstance =
+        bootstrap.Modal.getInstance(loginModalEl) ||
+        new bootstrap.Modal(loginModalEl);
+      modalInstance.show();
+    } else {
+      alert("Log in to delete comments.");
+    }
+    return;
+  }
+
+  const commentId = Number(btn.getAttribute("data-comment-id"));
+  const postId = Number(btn.getAttribute("data-post-id"));
+  const commentUserId = Number(btn.getAttribute("data-comment-user-id"));
+
+  if (!commentId || !postId) return;
+
+  const posts = loadPosts();
+  const post = posts.find((p) => p.id === postId);
+  if (!post) return;
+
+  const isPostOwner = currentUser.id === post.userId;
+  const isCommentOwner = currentUser.id === commentUserId;
+
+  if (!isPostOwner && !isCommentOwner) {
+    alert("You can only delete your own comments or comments on your posts.");
+    return;
+  }
+
+  if (!confirm("Delete this comment? This cannot be undone.")) return;
+
+  // 1) Remove from local comments map
+  const commentsMap = loadCommentsMap();
+  const key = String(postId);
+  const list = Array.isArray(commentsMap[key]) ? commentsMap[key] : [];
+  commentsMap[key] = list.filter((c) => c.id !== commentId);
+  saveCommentsMap(commentsMap);
+
+  // 2) Delete from Firestore
+  try {
+    await deleteDoc(doc(commentsCol, String(commentId)));
+  } catch (err) {
+    console.error("Error deleting comment from Firestore:", err);
+  }
+
+  // 3) Re-render comments for this post
+  const article = btn.closest(".post-card");
+  if (article) {
+    const commentsSection = article.querySelector(".post-comments");
+    if (commentsSection) {
+      renderCommentsForPost(postId, commentsSection);
+    }
+
+    // 4) Update comment count badge
+    const countEl = article.querySelector(".comment-btn .comment-count");
+    if (countEl) {
+      const updatedList = commentsMap[key] || [];
+      countEl.textContent = updatedList.length.toString();
+    }
+  }
+});
+
+// ===========================
 //  COMMENT FORM SUBMIT (Firestore)
 // ===========================
 document.addEventListener("submit", async function (e) {
@@ -1560,22 +1698,22 @@ document.addEventListener("submit", async function (e) {
   const hasFile = fileInput && fileInput.files && fileInput.files[0];
 
   // If there is a file, try to read it as a data URL
-  if (hasFile) {
-    const file = fileInput.files[0];
-    try {
-      imageDataUrl = await readImageAsDataUrl(file);
-    } catch (err) {
-      console.error("Error reading comment image on this device:", err);
-      // If the user put text, we still post the text-only comment.
-      if (!text) {
-        alert(
-          "Your image couldn't be processed on this device. Try a smaller image or add some text."
-        );
-        return;
-      }
-      imageDataUrl = null;
+  // If there is a file, try to read & RESIZE it as a data URL
+if (hasFile) {
+  const file = fileInput.files[0];
+  try {
+    imageDataUrl = await resizeImageTo300px(file);
+  } catch (err) {
+    console.error("Error reading comment image on this device:", err);
+    if (!text) {
+      alert(
+        "Your image couldn't be processed on this device. Try a smaller image or add some text."
+      );
+      return;
     }
+    imageDataUrl = null;
   }
+}
 
   // If no text and no image, do nothing
   if (!text && !imageDataUrl) return;
