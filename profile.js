@@ -1122,21 +1122,24 @@ document.addEventListener("submit", async function (e) {
 
   const hasFile = fileInput && fileInput.files && fileInput.files[0];
 
-  if (hasFile) {
-    const file = fileInput.files[0];
-    try {
-      imageDataUrl = await readImageAsDataUrl(file);
-    } catch (err) {
-      console.error("Error reading comment image on this device:", err);
-      if (!text) {
-        alert(
-          "Your image couldn't be processed on this device. Try a smaller image or add some text."
-        );
-        return;
-      }
-      imageDataUrl = null;
+  // If there is a file, try to read & resize it as a data URL
+if (hasFile) {
+  const file = fileInput.files[0];
+  try {
+    // ⬇️ use the resize helper instead of the full image
+    imageDataUrl = await resizeImageTo300px(file);
+  } catch (err) {
+    console.error("Error reading comment image on this device:", err);
+    // If the user put text, we still post the text-only comment.
+    if (!text) {
+      alert(
+        "Your image couldn't be processed on this device. Try a smaller image or add some text."
+      );
+      return;
     }
+    imageDataUrl = null;
   }
+}
 
   // Must have either text or image
   if (!text && !imageDataUrl) return;
