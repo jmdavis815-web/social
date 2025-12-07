@@ -410,18 +410,21 @@ function showToastError(message) {
 // ===========================
 async function syncUsersFromFirestore() {
   const snap = await getDocs(usersCol);
-  let users = [];
-
   if (snap.empty) {
     // If you seeded demo users from index.js, they'll get written there.
     return;
   }
 
-  users = snap.docs.map((d) => {
+  const users = snap.docs.map((d) => {
     const data = d.data();
+
+    // Prefer an explicit "id" field, else use the doc id (UID)
+    const effectiveId = data.id || d.id;
+
     return {
-      id: data.id ?? Number(d.id),
       ...data,
+      id: effectiveId,                       // local user.id is always a string
+      userId: data.userId || effectiveId,    // ensure userId is present for rules
     };
   });
 
@@ -1209,9 +1212,37 @@ function setupEditProfileForm(user, isOwnProfile) {
       users[idx] = updatedUser;
       saveUsers(users);
 
+            // 🔹 Always use the *authenticated* user's id as the Firestore doc id
       const current = getCurrentUser();
-      if (current && current.id === updatedUser.id) {
-        setCurrentUser(updatedUser);
+      if (!current) {
+        showToastError("You must be logged in to update your profile.");
+        return;
+      }
+
+      const docId = String(current.id);
+
+      const firestoreUserData = {
+        // IDs needed for security rules
+        id: docId,
+        userId: docId,
+
+        // Profile fields
+        name: updatedUser.name,
+        username: updatedUser.username,
+        location: updatedUser.location || "",
+        website: updatedUser.website || "",
+        bio: updatedUser.bio || "",
+        avatarDataUrl: updatedUser.avatarDataUrl || null,
+      };
+
+      try {
+        // Try updating existing doc
+        await updateDoc(doc(usersCol, docId), firestoreUserData);
+      } catch (err) {
+        console.warn("updateDoc failed, trying setDoc", err);
+        // If it doesn't exist yet, create it. This must still satisfy your rules:
+        // request.auth.uid == userId (doc path) and == request.resource.data.userId
+        await setDoc(doc(usersCol, docId), firestoreUserData);
       }
 
       // Update posts with new name/username
@@ -1606,9 +1637,6 @@ document.addEventListener("click", async function (e) {
 // ===========================
 //  FOLLOW / UNFOLLOW ON PROFILE
 // ===========================
-// ===========================
-//  FOLLOW / UNFOLLOW ON PROFILE
-// ===========================
 document.addEventListener("click", async function (e) {
   const btn = e.target.closest("[data-follow-target-id]");
   if (!btn) return;
@@ -1878,35 +1906,3 @@ document.addEventListener("DOMContentLoaded", async () => {
   renderProfile();
 });
 
-document.addEventListener("click", (e) => {
-  const btn = e.target.closest("[data-follow-user-id], [data-follow-target-id]");
-  if (!btn) return;
-
-  const currentUser = getCurrentUser();
-  if (!currentUser) {
-    showToastError("You must be logged in to follow users.");
-    return;
-  }
-
-  const targetId =
-    btn.dataset.followUserId || btn.dataset.followTargetId;
-
-  const nowFollowing = toggleFollowLocal(currentUser.id, Number(targetId));
-
-  // Update button label + style
-  btn.textContent = nowFollowing ? "Following" : "Follow";
-  btn.classList.toggle("btn-main", nowFollowing);
-  btn.classList.toggle("btn-outline-soft", !nowFollowing);
-
-  // Optional: Sync to Firestore
-  // await setDoc(doc(followsCol), { followerId: currentUser.id, targetId });
-
-  // Refresh profile header if on profile page
-  if (typeof renderProfileHeader === "function") {
-    const user = getProfileUser();
-    const isOwnProfile = currentUser.id === user.id;
-    renderProfileHeader(user, isOwnProfile);
-  }
-
-  showToastSuccess(nowFollowing ? "Following user" : "Unfollowed");
-});
