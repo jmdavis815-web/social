@@ -458,7 +458,8 @@ body {
 .profile-header.card,
 .profile-about.card,
 .profile-edit.card,
-.profile-posts.card {
+.profile-posts.card,
+.profile-following.card {
   background-color: var(--card-bg);
   border-radius: 1rem;
   border: 1px solid var(--card-border);

@@ -616,17 +616,28 @@ function renderProfileHeader(user, isOwnProfile) {
                 : ""
             }
           </div>
-          <div class="small text-body-secondary">
+                    <div class="small text-body-secondary">
             <span>${stats.postCount} post${
               stats.postCount === 1 ? "" : "s"
             }</span>
+
             <span class="ms-2">${stats.totalLikes} like${
               stats.totalLikes === 1 ? "" : "s"
             }</span>
+
             <span class="ms-2">${followStats.followerCount} follower${
               followStats.followerCount === 1 ? "" : "s"
             }</span>
-            <span class="ms-2">${followStats.followingCount} following</span>
+
+            <!-- Following count: clickable -->
+            <button
+              type="button"
+              class="btn btn-link p-0 ms-2 align-baseline following-trigger"
+              id="profileFollowingTrigger"
+              data-user-id="${user.id}"
+            >
+              ${followStats.followingCount} following
+            </button>
           </div>
         </div>
       </div>
@@ -709,6 +720,83 @@ function renderProfileTopics(user) {
   } across ${t.postCount} post${t.postCount === 1 ? "" : "s"}`;
   topicsEl.appendChild(pill);
 });
+}
+
+// ===========================
+//  RENDER FOLLOWING LIST CARD
+// ===========================
+function renderProfileFollowingList(profileUser, isOwnProfile) {
+  const card = document.getElementById("profileFollowingCard");
+  const listEl = document.getElementById("profileFollowingList");
+  if (!card || !listEl) return;
+
+  const followingIds = getFollowingIds(profileUser.id).map(String);
+  const allUsers = loadUsers();
+
+  const followingUsers = allUsers.filter((u) =>
+    followingIds.includes(String(u.id))
+  );
+
+  if (!followingUsers.length) {
+    listEl.innerHTML =
+      '<small class="text-body-secondary">Not following anyone yet.</small>';
+    return;
+  }
+
+  listEl.innerHTML = followingUsers
+    .map((u) => {
+      const avatarUrl = getAvatarUrlForUser(u);
+      const initials = getInitials(u.name || "U");
+
+      const avatarHtml = avatarUrl
+        ? `<img src="${escapeHtml(
+            avatarUrl
+          )}" alt="${escapeHtml(
+            u.name || "Avatar"
+          )}" class="mini-avatar-img" style="width:32px;height:32px;border-radius:50%;object-fit:cover;">`
+        : `<div class="mini-avatar d-inline-flex align-items-center justify-content-center">${escapeHtml(
+            initials
+          )}</div>`;
+
+      const profileLink = `profile.html?userId=${encodeURIComponent(u.id)}`;
+
+      // Only show "Remove" / Unfollow button on your OWN profile
+      const removeBtn = isOwnProfile
+        ? `<button
+             type="button"
+             class="btn btn-outline-soft btn-sm unfollow-btn"
+             data-target-id="${u.id}"
+           >
+             Remove
+           </button>`
+        : "";
+
+      return `
+        <div class="following-list-item d-flex justify-content-between align-items-center py-1 border-bottom">
+          <div class="d-flex align-items-center gap-2">
+            <a href="${profileLink}" class="avatar-link">
+              ${avatarHtml}
+            </a>
+            <div>
+              <a href="${profileLink}" class="text-decoration-none">
+                <strong>${escapeHtml(u.name || "Unnamed user")}</strong>
+              </a>
+              <div class="text-body-secondary small">
+                @${escapeHtml(u.username || "user")}
+              </div>
+            </div>
+          </div>
+          ${removeBtn}
+        </div>
+      `;
+    })
+    .join("");
+
+  // Remove bottom border from last item
+  const items = listEl.querySelectorAll(".following-list-item");
+  if (items.length) {
+    items[items.length - 1].classList.add("border-0");
+  }
 }
 
 // ===========================
@@ -1755,6 +1843,99 @@ document.addEventListener("click", function (e) {
   } else {
     card.style.display = "none"; // hide
     btn.textContent = "Edit";
+  }
+});
+
+// ===========================
+//  SHOW / HIDE FOLLOWING LIST
+// ===========================
+document.addEventListener("click", function (e) {
+  // Click on "X followers" button in header
+  const trigger = e.target.closest("#profileFollowingTrigger");
+  if (trigger) {
+    const card = document.getElementById("profileFollowingCard");
+    if (!card) return;
+
+    const profileUser = getProfileUser();
+    if (!profileUser) return;
+
+    const current = getCurrentUser();
+    const isOwnProfile =
+      current && String(current.id) === String(profileUser.id);
+
+    const isHidden =
+      card.hasAttribute("hidden") || card.style.display === "none";
+
+    if (isHidden) {
+      renderProfileFollowingList(profileUser, isOwnProfile);
+      card.style.display = "";
+      card.removeAttribute("hidden");
+    } else {
+      card.style.display = "none";
+      card.setAttribute("hidden", "true");
+    }
+    return;
+  }
+
+  // Close button on the Following card
+  const closeBtn = e.target.closest("#closeFollowingCardBtn");
+  if (closeBtn) {
+    const card = document.getElementById("profileFollowingCard");
+    if (card) {
+      card.style.display = "none";
+      card.setAttribute("hidden", "true");
+    }
+  }
+});
+
+// ===========================
+//  UNFOLLOW FROM FOLLOWING LIST
+// ===========================
+document.addEventListener("click", async function (e) {
+  const btn = e.target.closest(".unfollow-btn");
+  if (!btn) return;
+
+  const current = getCurrentUser();
+  if (!current) {
+    alert("Log in to manage who you follow.");
+    return;
+  }
+
+  const targetId = btn.getAttribute("data-target-id");
+  if (!targetId) return;
+
+  if (!confirm("Stop following this user?")) return;
+
+  // Only proceed if we are actually following them
+  if (!isFollowing(current.id, targetId)) {
+    return;
+  }
+
+  // 1) Update local follows map
+  toggleFollowLocal(current.id, targetId); // we know it will remove since we just checked
+
+  // 2) Delete follow doc in Firestore
+  const followDocId = `${current.id}_${targetId}`;
+  try {
+    await deleteDoc(doc(followsCol, followDocId));
+  } catch (err) {
+    console.error("Error removing follow in Firestore:", err);
+  }
+
+  // 3) Re-render header stats and posts
+  const profileUser = getProfileUser();
+  if (profileUser) {
+    const isOwnProfile = String(current.id) === String(profileUser.id);
+    renderProfileHeader(profileUser, isOwnProfile);
+    renderProfileAbout(profileUser);
+    renderProfileTopics(profileUser);
+    renderProfilePosts(profileUser, isOwnProfile);
+
+    // 4) If following card is open, refresh the list
+    const card = document.getElementById("profileFollowingCard");
+    if (card && !card.hasAttribute("hidden")) {
+      renderProfileFollowingList(profileUser, isOwnProfile);
+    }
   }
 });
 
