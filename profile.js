@@ -1017,17 +1017,17 @@ posts = posts.sort((a, b) => b.createdAt - a.createdAt);
     const canDelete = currentUser && currentUser.id === post.userId;
     const bodyHtml = escapeHtml(post.body || "").replace(/\n/g, "<br>");
 
-    const imageHtml = post.imageDataUrl
-      ? `
-        <div class="mt-2">
-          <img
-            src="${escapeHtml(post.imageDataUrl)}"
-            alt="Post image"
-            class="post-image"
-          />
-        </div>
-      `
-      : "";
+    const postImageHtml = post.imageDataUrl
+  ? `
+    <div class="post-image mt-2">
+      <img
+        src="${escapeHtml(post.imageDataUrl)}"
+        alt="Post image"
+        class="post-image-img"
+      />
+    </div>
+  `
+  : "";
 
     html += `
       <article class="post-card mb-2" data-post-id="${post.id}">
@@ -1065,8 +1065,8 @@ posts = posts.sort((a, b) => b.createdAt - a.createdAt);
 
             <div class="post-body">
               ${bodyHtml}
+              ${postImageHtml}
             </div>
-            ${imageHtml}
 
             <div class="post-actions mt-1">
               <button
