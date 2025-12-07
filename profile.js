@@ -1688,7 +1688,7 @@ if (hasFile) {
   // Must have either text or image
   if (!text && !imageDataUrl) return;
 
-  const commentId = Date.now();
+    const commentId = Date.now();
   const comment = {
     id: commentId,
     postId,
@@ -1700,12 +1700,25 @@ if (hasFile) {
     createdAt: Date.now(),
   };
 
+  // 🔔 Create a notification for the post owner (if it's not you)
+  const posts = loadPosts();
+  const post = posts.find((p) => p.id === postId);
+
+  if (post && user.id !== post.userId) {
+    addNotification(post.userId, {
+      postId: post.id,
+      commenterId: user.id,
+      commenterName: user.name,
+      text: comment.body,
+      timestamp: Date.now(),
+    });
+
+    // If YOU are the owner and you're on your profile page, your badge will update
+    updateNotificationBadge();
+  }
+
   // Local
   addCommentToLocal(postId, comment);
-  input.value = "";
-  if (fileInput) {
-    fileInput.value = "";
-  }
 
   // Firestore
   try {
@@ -2214,6 +2227,69 @@ document.addEventListener("click", function (e) {
   }
 });
 
+const NOTIFICATIONS_KEY = "openwall-notifications";
+
+// Load notification map
+function loadNotifications() {
+  try {
+    return JSON.parse(localStorage.getItem(NOTIFICATIONS_KEY)) || {};
+  } catch {
+    return {};
+  }
+}
+
+// Save notification map
+function saveNotifications(map) {
+  localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(map));
+}
+
+// Add a new notification
+function addNotification(userId, notif) {
+  const map = loadNotifications();
+  const list = Array.isArray(map[userId]) ? map[userId] : [];
+  list.push(notif);
+  map[userId] = list;
+  saveNotifications(map);
+}
+
+// Mark all as read
+function clearNotifications(userId) {
+  const map = loadNotifications();
+  map[userId] = [];
+  saveNotifications(map);
+}
+
+// Count unread
+function getNotificationCount(userId) {
+  const map = loadNotifications();
+  const list = map[userId] || [];
+  return list.length;
+}
+
+function updateNotificationBadge() {
+  const badge = document.getElementById("notificationBadge");
+  const current = getCurrentUser();
+  if (!badge) return;
+
+  // Logged out → always hide
+  if (!current) {
+    badge.textContent = "";
+    badge.style.display = "none";
+    return;
+  }
+
+  const count = getNotificationCount(current.id);
+  if (count > 0) {
+    badge.textContent = String(count);
+    badge.style.display = "inline-block";
+  } else {
+    badge.textContent = "";
+    badge.style.display = "none";
+  }
+}
+
+updateNotificationBadge();
+
 // ===========================
 //  INIT
 // ===========================
@@ -2234,4 +2310,90 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   renderProfile();
 });
+
+// ===========================
+//  NOTIFICATION BELL + PANEL
+// ===========================
+const notifBtn = document.getElementById("notificationBell");
+const notifPanel = document.getElementById("notificationPanel");
+const notifList = document.getElementById("notificationList");
+const notifEmpty = document.getElementById("notificationEmpty");
+
+if (notifBtn && notifPanel && notifList) {
+  notifBtn.addEventListener("click", (e) => {
+    e.preventDefault();
+
+    const current = getCurrentUser();
+    if (!current) {
+      // Optionally show a toast instead of alert
+      alert("Log in to see notifications.");
+      return;
+    }
+
+    const map = loadNotifications();
+    const unread = Array.isArray(map[current.id]) ? map[current.id] : [];
+
+    if (!unread.length) {
+      // No notifications
+      if (notifEmpty) {
+        notifEmpty.textContent = "No notifications yet.";
+        notifEmpty.style.display = "block";
+      }
+      notifList.innerHTML = "";
+    } else {
+      if (notifEmpty) {
+        notifEmpty.style.display = "none";
+      }
+
+      notifList.innerHTML = unread
+        .map(
+          (n) => `
+          <li class="list-group-item small">
+            <strong>${escapeHtml(n.commenterName || "Someone")}</strong>
+            commented on your post:<br>
+            <span class="text-body-secondary">"${escapeHtml(n.text || "")}"</span>
+          </li>
+        `
+        )
+        .join("");
+    }
+
+    // Mark all as read + update badge
+    clearNotifications(current.id);
+    updateNotificationBadge();
+
+    // Toggle hidden attribute
+    const isHidden =
+      notifPanel.hasAttribute("hidden") || notifPanel.style.display === "none";
+
+    if (isHidden) {
+      notifPanel.removeAttribute("hidden");
+      notifPanel.style.display = "block";
+    } else {
+      notifPanel.setAttribute("hidden", "true");
+      notifPanel.style.display = "none";
+    }
+  });
+
+  // Close when clicking outside
+  document.addEventListener("click", (e) => {
+    if (!notifPanel.contains(e.target) && !notifBtn.contains(e.target)) {
+      notifPanel.setAttribute("hidden", "true");
+      notifPanel.style.display = "none";
+    }
+  });
+
+  // Optional: close button inside the panel
+  const closeBtn = document.getElementById("notificationCloseBtn");
+  if (closeBtn) {
+    closeBtn.addEventListener("click", () => {
+      notifPanel.setAttribute("hidden", "true");
+      notifPanel.style.display = "none";
+    });
+  }
+}
+
+
+
+
 

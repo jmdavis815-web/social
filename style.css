@@ -736,4 +736,18 @@ small.text-body-secondary {
   border: 1px solid var(--card-border);
 }
 
+.notification-panel {
+  position: fixed;
+  top: 4rem;           /* just under the navbar */
+  right: 1rem;
+  width: min(340px, 90vw);
+  max-height: 70vh;
+  overflow-y: auto;
+  z-index: 1080;       /* above navbar, below modals */
+}
+
+.notification-panel .list-group-item {
+  cursor: default;
+  white-space: normal;
+}
 

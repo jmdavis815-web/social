@@ -62,6 +62,202 @@ function loadLikes() {
   }
 }
 
+// ===========================
+//  NOTIFICATIONS (LOCAL STORAGE)
+// ===========================
+const NOTIFICATIONS_KEY = "openwall-notifications";
+
+function loadNotificationsMap() {
+  try {
+    const raw = localStorage.getItem(NOTIFICATIONS_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch (err) {
+    console.error("Error loading notifications:", err);
+    return {};
+  }
+}
+
+function saveNotificationsMap(map) {
+  try {
+    localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(map));
+  } catch (err) {
+    console.error("Error saving notifications:", err);
+  }
+}
+
+/**
+ * Add a notification for a specific user.
+ * `payload` can be any object describing the notification.
+ */
+function addNotification(userId, payload) {
+  if (!userId) return;
+  const map = loadNotificationsMap();
+  const key = String(userId);
+
+  if (!Array.isArray(map[key])) {
+    map[key] = [];
+  }
+
+  const notification = {
+    id: Date.now(),
+    type: payload.type || "comment",
+    postId: payload.postId || null,
+    commenterId: payload.commenterId || null,
+    commenterName: payload.commenterName || "Someone",
+    text: payload.text || "",
+    timestamp: payload.timestamp || Date.now(),
+  };
+
+  // newest first
+  map[key].unshift(notification);
+
+  saveNotificationsMap(map);
+}
+
+/**
+ * Get notifications for a given userId
+ */
+function getNotificationsForUser(userId) {
+  if (!userId) return [];
+  const map = loadNotificationsMap();
+  const key = String(userId);
+  return Array.isArray(map[key]) ? map[key] : [];
+}
+
+/**
+ * Clear notifications for a given userId
+ */
+function clearNotificationsForUser(userId) {
+  if (!userId) return;
+  const map = loadNotificationsMap();
+  const key = String(userId);
+  map[key] = [];
+  saveNotificationsMap(map);
+}
+
+/**
+ * Update the little badge on the bell in the nav
+ */
+function updateNotificationBadge() {
+  const badge = document.getElementById("notificationBadge");
+  const currentUser = getCurrentUser();
+
+  if (!badge) return;
+
+  if (!currentUser) {
+    badge.textContent = "";
+    badge.style.display = "none";
+    return;
+  }
+
+  const list = getNotificationsForUser(currentUser.id);
+  const count = list.length;
+
+  if (count > 0) {
+    badge.textContent = String(count);
+    badge.style.display = "inline-block";
+  } else {
+    badge.textContent = "";
+    badge.style.display = "none";
+  }
+}
+
+/**
+ * Render the notification panel when you click the bell
+ */
+function renderNotificationsPanel() {
+  const currentUser = getCurrentUser();
+  const panel = document.getElementById("notificationPanel");
+  const listEl = document.getElementById("notificationList");
+  const emptyEl = document.getElementById("notificationEmpty");
+
+  if (!panel || !listEl || !emptyEl) return;
+
+  if (!currentUser) {
+    listEl.innerHTML = "";
+    emptyEl.textContent = "Log in to see notifications.";
+    panel.removeAttribute("hidden");
+    return;
+  }
+
+  const notifications = getNotificationsForUser(currentUser.id);
+
+  if (!notifications.length) {
+    listEl.innerHTML = "";
+    emptyEl.textContent = "No notifications yet.";
+    panel.removeAttribute("hidden");
+    return;
+  }
+
+  emptyEl.textContent = "";
+  listEl.innerHTML = "";
+
+  notifications
+    .slice()
+    .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
+    .forEach((n) => {
+      const when = timeAgo(n.timestamp || Date.now());
+      const li = document.createElement("li");
+      li.className = "list-group-item small";
+
+      const text =
+        n.type === "comment"
+          ? `${n.commenterName} commented on your post: “${n.text.slice(
+              0,
+              80
+            )}${n.text.length > 80 ? "…" : ""}”`
+          : n.text || "New activity on your post";
+
+      li.innerHTML = `
+        <div class="d-flex flex-column">
+          <span>${escapeHtml(text)}</span>
+          <span class="text-body-secondary">${escapeHtml(when)}</span>
+        </div>
+      `;
+
+      listEl.appendChild(li);
+    });
+
+  panel.removeAttribute("hidden");
+}
+
+// Hook up the bell
+// Hook up the bell (direct listener, easier to debug)
+window.addEventListener("DOMContentLoaded", () => {
+  const bell = document.getElementById("notificationBell");
+  if (!bell) {
+    console.warn("notificationBell element not found in DOM");
+    return;
+  }
+
+  bell.addEventListener("click", (e) => {
+    e.preventDefault(); // prevent link navigation if it's an <a>
+    console.log("Notification bell clicked");
+
+    const panel = document.getElementById("notificationPanel");
+    if (!panel) {
+      console.warn("notificationPanel element not found");
+      return;
+    }
+
+    const isHidden = panel.hasAttribute("hidden");
+    if (isHidden) {
+      // show + render
+      renderNotificationsPanel();
+
+      // clear them (optional: only after viewing)
+      const currentUser = getCurrentUser();
+      if (currentUser) {
+        clearNotificationsForUser(currentUser.id);
+        updateNotificationBadge();
+      }
+    } else {
+      // hide
+      panel.setAttribute("hidden", "true");
+    }
+  });
+});
+
 function saveLikes(map) {
   localStorage.setItem(LIKES_KEY, JSON.stringify(map));
 }
@@ -1219,6 +1415,17 @@ document.addEventListener("click", function (e) {
   renderPeopleToFollow();
 });
 
+document.addEventListener("click", function (e) {
+  const closeBtn = e.target.closest("#notificationCloseBtn");
+  if (!closeBtn) return;
+
+  const panel = document.getElementById("notificationPanel");
+  if (panel) {
+    panel.setAttribute("hidden", "true");
+  }
+});
+
+
 // ===========================
 //  AUTH UI UPDATES
 // ===========================
@@ -1351,6 +1558,7 @@ function updateAuthUI() {
     }
   }
   renderFeedFilterBar();
+   updateNotificationBadge();
 }
 
 // ===========================
@@ -1377,6 +1585,7 @@ onAuthStateChanged(auth, async (fbUser) => {
     // Signed out
     clearCurrentUser();
     updateAuthUI();
+    updateNotificationBadge(); // clear badge on logout too, if you like
     return;
   }
 
@@ -1398,15 +1607,18 @@ onAuthStateChanged(auth, async (fbUser) => {
         id: uid,
         name: fbUser.displayName || "New User",
         username:
-          fbUser.email?.split("@")[0] || `user-${uid.slice(0, 6)}`,
+          (fbUser.email && fbUser.email.split("@")[0]) ||
+          `user-${uid.slice(0, 6)}`,
         email: fbUser.email || "",
         createdAt: Date.now(),
       };
+
       await setDoc(doc(usersCol, uid), user);
     }
 
     setCurrentUser(user);
     updateAuthUI();
+    updateNotificationBadge(); // ✅ refresh badge after login
   } catch (err) {
     console.error("Error in onAuthStateChanged profile sync:", err);
   }
@@ -2009,16 +2221,17 @@ document.addEventListener("click", async function (e) {
 });
 
 // ===========================
-//  COMMENT FORM SUBMIT (Firestore)
+//  COMMENT FORM SUBMIT (Firestore + Notifications)
 // ===========================
 document.addEventListener("submit", async function (e) {
   const form = e.target.closest(".comment-form");
-  if (!form) return;
+  if (!form) return; // not a comment form
 
   e.preventDefault();
 
   const user = getCurrentUser();
   if (!user) {
+    // If you have a login modal, open it; otherwise alert.
     const loginModalEl = document.getElementById("loginModal");
     if (loginModalEl && typeof bootstrap !== "undefined") {
       const modalInstance =
@@ -2048,6 +2261,7 @@ document.addEventListener("submit", async function (e) {
   if (hasFile) {
     const file = fileInput.files[0];
     try {
+      // Uses your existing helper
       imageDataUrl = await resizeImageTo300px(file);
     } catch (err) {
       console.error("Error reading comment image on this device:", err);
@@ -2061,7 +2275,7 @@ document.addEventListener("submit", async function (e) {
     }
   }
 
-  // If no text and no image, do nothing
+  // Must have either text or image
   if (!text && !imageDataUrl) return;
 
   const commentId = Date.now();
@@ -2069,39 +2283,59 @@ document.addEventListener("submit", async function (e) {
     id: commentId,
     postId,
     userId: user.id,
-    name: user.name,
     username: user.username,
-    avatarDataUrl: user.avatarDataUrl || null,
+    name: user.name,
     body: text,
-    text: text, // for backward compatibility
     imageDataUrl: imageDataUrl || null,
     createdAt: Date.now(),
   };
 
-  // Local cache
-  addCommentToLocal(postId, comment);
-  input.value = "";
-  if (fileInput) {
-    fileInput.value = "";
+  // 🔔 Create a notification for the post owner (including yourself)
+  const posts = loadPosts();
+  const post = posts.find((p) => p.id === postId);
+
+  if (post) {
+    addNotification(post.userId, {
+      type: "comment",
+      postId: post.id,
+      commenterId: user.id,
+      commenterName: user.name,
+      text: comment.body,
+      timestamp: Date.now(),
+    });
+
+    console.log("Notifications map now:", loadNotificationsMap());
+    updateNotificationBadge();
   }
 
-  // Firestore write (even if it fails, local comment still shows)
+  // Local comments map
+  addCommentToLocal(postId, comment);
+
+  // Firestore write
   try {
     await setDoc(doc(commentsCol, String(commentId)), comment);
   } catch (err) {
     console.error("Error writing comment to Firestore:", err);
   }
 
+  // Re-render comments in that post’s panel
   const commentsSection = article.querySelector(".post-comments");
   if (commentsSection) {
     renderCommentsForPost(postId, commentsSection);
   }
 
+  // Update comment count badge
   const countEl = article.querySelector(".comment-btn .comment-count");
   if (countEl) {
     let currentCount = parseInt(countEl.textContent || "0", 10) || 0;
     currentCount += 1;
     countEl.textContent = currentCount;
+  }
+
+  // Clear input + file
+  input.value = "";
+  if (fileInput) {
+    fileInput.value = "";
   }
 });
 
@@ -2150,58 +2384,5 @@ document.addEventListener("click", function (e) {
   }
 });
 
-// ===========================
-//  LOGOUT BUTTONS (legacy header version)
-// ===========================
-function updateAuthButtons() {
-  const current = getCurrentUser();
-  const loginBtn = document.getElementById("loginNavBtn");
-  const signupBtn = document.getElementById("signupNavBtn");
-  const logoutBtn = document.getElementById("logoutBtn");
 
-  if (!loginBtn || !signupBtn || !logoutBtn) return;
-
-  if (current) {
-    loginBtn.style.display = "none";
-    signupBtn.style.display = "none";
-    logoutBtn.style.display = "inline-block";
-  } else {
-    loginBtn.style.display = "inline-block";
-    signupBtn.style.display = "inline-block";
-    logoutBtn.style.display = "none";
-  }
-}
-
-document.addEventListener("click", (e) => {
-  const btn = e.target.closest("[data-follow-user-id], [data-follow-target-id]");
-  if (!btn) return;
-
-  const currentUser = getCurrentUser();
-  if (!currentUser) {
-    showToastError("You must be logged in to follow users.");
-    return;
-  }
-
-  const targetId =
-    btn.dataset.followUserId || btn.dataset.followTargetId;
-
-  const nowFollowing = toggleFollowLocal(currentUser.id, Number(targetId));
-
-  // Update button label + style
-  btn.textContent = nowFollowing ? "Following" : "Follow";
-  btn.classList.toggle("btn-main", nowFollowing);
-  btn.classList.toggle("btn-outline-soft", !nowFollowing);
-
-  // Optional: Sync to Firestore
-  // await setDoc(doc(followsCol), { followerId: currentUser.id, targetId });
-
-  // Refresh profile header if on profile page
-  if (typeof renderProfileHeader === "function") {
-    const user = getProfileUser();
-    const isOwnProfile = currentUser.id === user.id;
-    renderProfileHeader(user, isOwnProfile);
-  }
-
-  showToastSuccess(nowFollowing ? "Following user" : "Unfollowed");
-});
 
