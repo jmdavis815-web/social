@@ -699,14 +699,16 @@ function renderProfileTopics(user) {
   }
 
   topics.forEach((t) => {
-    const pill = document.createElement("span");
-    pill.className = "tag-pill";
-    pill.textContent = `#${t.topic} · ${t.totalLikes}♥`;
-    pill.title = `${t.totalLikes} like${
-      t.totalLikes === 1 ? "" : "s"
-    } across ${t.postCount} post${t.postCount === 1 ? "" : "s"}`;
-    topicsEl.appendChild(pill);
-  });
+  const pill = document.createElement("span");
+  pill.className = "tag-pill";
+  pill.dataset.topic = t.topic;   // 👈 important
+
+  pill.textContent = `#${t.topic} · ${t.totalLikes}♥`;
+  pill.title = `${t.totalLikes} like${
+    t.totalLikes === 1 ? "" : "s"
+  } across ${t.postCount} post${t.postCount === 1 ? "" : "s"}`;
+  topicsEl.appendChild(pill);
+});
 }
 
 // ===========================
@@ -796,6 +798,10 @@ function renderCommentsForPost(postId, commentsSection) {
     });
 }
 
+// Current hashtag filter on THIS profile page
+let profileActiveTopic = null;
+
+
 // ===========================
 //  RENDER PROFILE POSTS
 // ===========================
@@ -804,9 +810,20 @@ function renderProfilePosts(profileUser, isOwnProfile) {
   if (!card || !profileUser) return;
 
   const allPosts = loadPosts();
-  const posts = allPosts
-    .filter((p) => p.userId === profileUser.id)
-    .sort((a, b) => b.createdAt - a.createdAt);
+
+// First: only this user's posts
+let posts = allPosts.filter((p) => p.userId === profileUser.id);
+
+// If a topic filter is active, restrict to posts that include that tag
+if (profileActiveTopic) {
+  posts = posts.filter((p) => {
+    const tags = (p.tags || []).map((t) => t.toLowerCase());
+    return tags.includes(profileActiveTopic);
+  });
+}
+
+// Newest first
+posts = posts.sort((a, b) => b.createdAt - a.createdAt);
 
   const currentUser = getCurrentUser();
 
@@ -1882,6 +1899,46 @@ document.addEventListener("click", async function (e) {
       const updatedList = commentsMap[key] || [];
       countEl.textContent = updatedList.length.toString();
     }
+  }
+});
+
+// ===========================
+//  PROFILE TOPIC FILTER
+// ===========================
+document.addEventListener("click", function (e) {
+  // Only handle topic pills inside the profile sidebar
+  const pill = e.target.closest("#profileTopics .tag-pill[data-topic]");
+  if (!pill) return;
+
+  const topic = pill.dataset.topic;
+  if (!topic) return;
+
+  // Toggle behaviour: click again to clear
+  if (profileActiveTopic === topic) {
+    profileActiveTopic = null;
+    pill.classList.remove("active");
+  } else {
+    profileActiveTopic = topic;
+    // Remove active from any other pills in the sidebar
+    document
+      .querySelectorAll("#profileTopics .tag-pill[data-topic].active")
+      .forEach((el) => el.classList.remove("active"));
+
+    pill.classList.add("active");
+  }
+
+  // Re-render the posts for this profile with the new filter
+  const profileUser = getProfileUser();
+  if (profileUser) {
+    const currentUser = getCurrentUser();
+    const isOwnProfile = currentUser && currentUser.id === profileUser.id;
+    renderProfilePosts(profileUser, isOwnProfile);
+  }
+
+  // Optional: scroll posts into view
+  const postsCard = document.getElementById("profilePosts");
+  if (postsCard) {
+    postsCard.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 });
 
