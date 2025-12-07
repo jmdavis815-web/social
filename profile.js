@@ -1460,6 +1460,97 @@ function renderProfile() {
   renderProfileTopics(profileUser);
   renderProfilePosts(profileUser, isOwnProfile);
   setupEditProfileForm(profileUser, isOwnProfile);
+
+  // 🔹 NEW: keep profile navbar in sync
+  updateProfileNavAvatar(profileUser, !!isOwnProfile);
+}
+
+// ===========================
+//  NAVBAR AVATAR ON PROFILE
+// ===========================
+function updateProfileNavAvatar(profileUser, isOwnProfile) {
+  const user = getCurrentUser();
+
+  const loginNavBtn = document.getElementById("loginNavBtn");
+  const signupNavBtn = document.getElementById("signupNavBtn");
+  const logoutBtn = document.getElementById("logoutBtn");   // 👈 use the existing one
+
+  let userBadge = document.getElementById("navUserBadge");
+
+  const navActionContainer = loginNavBtn
+    ? loginNavBtn.parentElement
+    : document.querySelector(".navbar .d-flex.align-items-center.gap-2");
+
+  if (!navActionContainer) return;
+
+  if (user) {
+    // Hide login / signup, show logout
+    if (loginNavBtn) loginNavBtn.style.display = "none";
+    if (signupNavBtn) signupNavBtn.style.display = "none";
+    if (logoutBtn) logoutBtn.style.display = "inline-block";
+
+    const showAvatar = !isOwnProfile; // only when viewing someone ELSE
+
+    if (showAvatar) {
+      if (!userBadge) {
+        userBadge = document.createElement("a");
+        userBadge.id = "navUserBadge";
+        userBadge.className = "avatar-link me-1";
+        userBadge.style.display = "inline-flex";
+        userBadge.style.alignItems = "center";
+        userBadge.style.justifyContent = "center";
+        userBadge.style.textDecoration = "none";
+        navActionContainer.prepend(userBadge);
+      }
+
+      const avatarUrl = user.avatarDataUrl || user.avatar || null;
+      const displayName = user.name || user.username || "User";
+      const initials =
+        (displayName || "")
+          .split(" ")
+          .filter(Boolean)
+          .map((n) => n[0])
+          .join("")
+          .slice(0, 2)
+          .toUpperCase() || "U";
+
+      const avatarHtml = avatarUrl
+        ? `
+          <div class="mini-avatar">
+            <img
+              src="${escapeHtml(avatarUrl)}"
+              alt="${escapeHtml(initials)}"
+              class="post-avatar-img"
+            />
+          </div>
+        `
+        : `
+          <div class="mini-avatar">
+            ${escapeHtml(initials)}
+          </div>
+        `;
+
+      userBadge.innerHTML = avatarHtml;
+      userBadge.href = `profile.html?userId=${encodeURIComponent(user.id)}`;
+      userBadge.title = `${displayName} (@${user.username})`;
+      userBadge.style.cursor = "pointer";
+    } else {
+      // On YOUR OWN profile: remove any old badge
+      if (userBadge && userBadge.parentNode) {
+        userBadge.parentNode.removeChild(userBadge);
+        userBadge = null;
+      }
+    }
+  } else {
+    // Logged OUT → show login/signup, hide logout and avatar
+    if (loginNavBtn) loginNavBtn.style.display = "";
+    if (signupNavBtn) signupNavBtn.style.display = "";
+    if (logoutBtn) logoutBtn.style.display = "none";
+
+    if (userBadge && userBadge.parentNode) {
+      userBadge.parentNode.removeChild(userBadge);
+    }
+  }
 }
 
 // ===========================
