@@ -709,6 +709,12 @@ small.text-body-secondary {
   text-transform: uppercase;
 }
 
+@media (max-width: 600px) {
+  .post-image-img {
+    max-width: 200px;
+  }
+}
+
 .post-image-img {
   max-width: 100vw;
   height: auto;

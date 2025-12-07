@@ -666,41 +666,18 @@ function renderPosts() {
     .slice()
     .sort((a, b) => b.createdAt - a.createdAt);
 
-  // Apply hashtag filter if active
+  // Start with all posts
   let posts = allPosts;
+
+  // 🔹 Apply hashtag filter if active
   if (activeTopic) {
-    posts = allPosts.filter((p) => {
+    posts = posts.filter((p) => {
       const tags = (p.tags || []).map((t) => t.toLowerCase());
       return tags.includes(activeTopic);
     });
   }
 
-  if (activeFeedFilter === "following" && currentUser) {
-    const followingIds = getFollowingIds(currentUser.id);
-
-    posts = posts.filter((p) => {
-      // Always show your own posts
-      if (p.userId === currentUser.id) return true;
-      // Otherwise only posts from people you follow
-      return followingIds.includes(p.userId);
-    });
-  }
-
-  container.innerHTML = "";
-
-  if (!posts.length) {
-    const empty = document.createElement("div");
-    empty.className = "text-body-secondary small";
-    empty.textContent = activeTopic
-      ? `No posts found for #${activeTopic} yet.`
-      : activeFeedFilter === "following"
-      ? "No posts from people you follow yet. Try the All tab."
-      : "No posts yet. Be the first to post!";
-    container.appendChild(empty);
-    return;
-  }
-
-    // 🔹 Apply "Following" vs "All" feed filter
+  // 🔹 Apply "Following" vs "All" feed filter
   const currentUser = getCurrentUser();
   if (!currentUser) {
     // If not logged in, always show ALL
@@ -731,6 +708,32 @@ function renderPosts() {
       return inBody || inTags;
     });
   }
+
+  // Now we’re ready to render
+  container.innerHTML = "";
+
+  if (!posts.length) {
+    const empty = document.createElement("div");
+    empty.className = "text-body-secondary small";
+
+    if (q) {
+      empty.textContent = `No posts matching "${activeSearchQuery}".`;
+    } else if (activeTopic) {
+      empty.textContent = `No posts found for #${activeTopic} yet.`;
+    } else if (activeFeedFilter === "following") {
+      empty.textContent = "No posts from people you follow yet. Try the All tab.";
+    } else {
+      empty.textContent = "No posts yet. Be the first to post!";
+    }
+
+    container.appendChild(empty);
+    return;
+  }
+
+  // 👇 keep your existing rendering loop here (posts.forEach(...))
+  posts.forEach((post) => {
+    // ... your existing card creation / comment / like rendering ...
+  });
 
   container.innerHTML = "";
 
