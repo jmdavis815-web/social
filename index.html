@@ -220,21 +220,31 @@
 
         <div id="feedFilterBar" class="d-flex gap-2 align-items-center mb-2">
   <button
-    id="feedFilterFollowing"
     type="button"
-    class="btn btn-main btn-sm rounded-4"
+    class="btn btn-main btn-sm"
+    id="feedFilterFollowing"
   >
     Following
   </button>
   <button
-    id="feedFilterAll"
     type="button"
-    class="btn btn-outline-soft btn-sm rounded-4"
+    class="btn btn-outline-soft btn-sm"
+    id="feedFilterAll"
   >
     All
   </button>
-</div>
 
+  <!-- 🔍 Topic/text search -->
+  <div class="ms-auto" style="max-width: 240px;">
+    <input
+      type="search"
+      class="form-control form-control-sm"
+      id="topicSearchInput"
+      placeholder="Search posts or #topics…"
+      autocomplete="off"
+    />
+  </div>
+</div>
 
         <!-- ACTIVE TOPIC FILTER BAR -->
         <div id="activeFilterBar" class="active-filter-bar" hidden>

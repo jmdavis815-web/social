@@ -212,6 +212,7 @@ if (themeToggle) {
 // ===========================
 let activeTopic = null; // current hashtag filter
 let activeFeedFilter = "following"; // "following" | "all"
+let activeSearchQuery = "";
 
 function extractTagsFromText(text) {
   if (!text) return [];
@@ -674,13 +675,6 @@ function renderPosts() {
     });
   }
 
-  // 🔹 Apply "Following" vs "All" feed filter
-  const currentUser = getCurrentUser();
-  if (!currentUser) {
-    // If not logged in, always show ALL
-    activeFeedFilter = "all";
-  }
-
   if (activeFeedFilter === "following" && currentUser) {
     const followingIds = getFollowingIds(currentUser.id);
 
@@ -705,6 +699,40 @@ function renderPosts() {
     container.appendChild(empty);
     return;
   }
+
+    // 🔹 Apply "Following" vs "All" feed filter
+  const currentUser = getCurrentUser();
+  if (!currentUser) {
+    // If not logged in, always show ALL
+    activeFeedFilter = "all";
+  }
+
+  if (activeFeedFilter === "following" && currentUser) {
+    const followingIds = getFollowingIds(currentUser.id);
+
+    posts = posts.filter((p) => {
+      // Always show your own posts
+      if (p.userId === currentUser.id) return true;
+      // Otherwise only posts from people you follow
+      return followingIds.includes(p.userId);
+    });
+  }
+
+  // 🔍 Apply text / topic search if present
+  const q = (activeSearchQuery || "").trim().toLowerCase();
+  if (q) {
+    posts = posts.filter((p) => {
+      const body = (p.body || "").toLowerCase();
+      const tags = (p.tags || []).map((t) => String(t).toLowerCase());
+
+      const inBody = body.includes(q);
+      const inTags = tags.some((tag) => tag.includes(q));
+
+      return inBody || inTags;
+    });
+  }
+
+  container.innerHTML = "";
 
   const users = loadUsers();
 
@@ -1103,11 +1131,32 @@ async function syncUsersFromFirestore() {
   saveUsers(users);
 }
 
+function initTopicSearchBar() {
+  const input = document.getElementById("topicSearchInput");
+  if (!input) return;
+
+  // Restore any existing query if you navigate away & back
+  input.value = activeSearchQuery;
+
+  // Prevent Enter from accidentally submitting anything
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+    }
+  });
+
+  input.addEventListener("input", () => {
+    activeSearchQuery = input.value;
+    renderPosts();
+  });
+}
+
 // ===========================
 //  INIT POSTS
 // ===========================
 function initPosts() {
   renderFeedFilterBar();
+  initTopicSearchBar();      // 🔍 NEW
   renderPosts();
   renderPopularTopics();
   renderActiveTopicBar();
