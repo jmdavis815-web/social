@@ -516,7 +516,7 @@ body {
   display: block;
   max-width: 300px;
   max-height: 300px;
-  width: auto;
+  width: 100%;
   height: auto;
   border-radius: 0.6rem;
   margin-top: 0.35rem;
@@ -723,6 +723,17 @@ small.text-body-secondary {
 
 #sideCol {
   width: 100%;
+}
+
+.comment-image {
+  display: block;
+  width: 100%;      /* fill the content area */
+  max-width: 100%;  /* never overflow the card */
+  height: auto;
+  max-height: 300px; /* optional: keep them from getting super tall */
+  border-radius: 0.6rem;
+  margin-top: 0.35rem;
+  border: 1px solid var(--card-border);
 }
 
 
