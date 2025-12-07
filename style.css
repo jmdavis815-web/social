@@ -689,8 +689,8 @@ small.text-body-secondary {
 
 /* Comment avatar – fixed, round, non-flexing */
 .comment-avatar {
-  width: 100%;
-  height: 100%;
+  width: 38px;
+  height: 38px;
   flex: 0 0 42px;
   border-radius: 50%;
   overflow: hidden;
@@ -701,10 +701,10 @@ small.text-body-secondary {
 }
 
 .comment-avatar img {
-  width: 100%;
-  height: 100%;
-  min-height: fit-content;
-  object-fit: cover;
+  width: 38px;
+  min-width: 32px;
+  height: 38px;
+  min-height: 32px;
   border-radius: 50%;
 }
 
