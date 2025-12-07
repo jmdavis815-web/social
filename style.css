@@ -570,6 +570,7 @@ small.text-body-secondary {
 /* Make sure avatar in header looks solid */
 #profileHeader .post-avatar {
   width: 125px;
+  min-width: 125px;
   height: 125px;
   font-size: 1.2rem;
 }
