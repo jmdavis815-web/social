@@ -52,7 +52,7 @@ const CURRENT_USER_KEY = "openwall-current";  // current logged-in user
 const POSTS_KEY = "openwall-posts";           // array of posts
 const COMMENTS_KEY = "openwall-comments";     // map: postId -> array of comments
 const FOLLOWS_KEY = "openwall-follows";       // map followerId -> [followedUserId, ...]
-const LIKES_KEY = "openwall-likes";         // map userId -> [likedPostId, ...]
+const LIKES_KEY = "openwall-likes";           // map userId -> [likedPostId, ...]
 
 function loadLikes() {
   try {
@@ -371,7 +371,7 @@ async function readImageAsDataUrl(file) {
   });
 }
 
-// (Optional) Resize helper if you want it later
+// Resize helper
 async function resizeImageTo300px(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -566,7 +566,7 @@ function renderPeopleToFollow() {
         .toUpperCase() || "U";
 
     const avatarHtml = u.avatarUrl
-  ? `
+      ? `
       <div class="mini-avatar">
         <img
           src="${escapeHtml(u.avatarUrl)}"
@@ -575,7 +575,7 @@ function renderPeopleToFollow() {
         />
       </div>
     `
-  : `
+      : `
       <div class="mini-avatar">
         ${escapeHtml(initials)}
       </div>
@@ -843,47 +843,46 @@ function renderPosts() {
 }
 
 // ===========================
-//  RENDER POSTS
+//  RENDER COMMENTS FOR A POST
 // ===========================
 function renderCommentsForPost(postId, commentsSection) {
+  if (!commentsSection) return;
+
   const listEl = commentsSection.querySelector(".comment-list");
   if (!listEl) return;
 
   const comments = getCommentsForPost(postId);
   listEl.innerHTML = "";
 
-  if (!posts.length) {
-  const empty = document.createElement("div");
-  empty.className = "text-body-secondary small";
-  empty.textContent = activeTopic
-    ? `No posts found for #${activeTopic} yet.`
-    : activeFeedFilter === "following"
-    ? "No posts from people you follow yet. Try the All tab."
-    : "No posts yet. Be the first to post!";
-  container.appendChild(empty);
-  return;
-}
+  if (!comments.length) {
+    listEl.innerHTML = `
+      <div class="text-body-secondary small">
+        No comments yet. Be the first to reply.
+      </div>
+    `;
+    return;
+  }
 
   const posts = loadPosts();
   const post = posts.find((p) => p.id === postId);
   const currentUser = getCurrentUser();
 
   comments
-  .slice()
-  .sort((a, b) => a.createdAt - b.createdAt)
-  .forEach((c) => {
-    const item = document.createElement("div");
-    item.className = "comment-item small";
+    .slice()
+    .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0))
+    .forEach((c) => {
+      const item = document.createElement("div");
+      item.className = "comment-item small";
 
-    const when = timeAgo(c.createdAt || Date.now());
+      const when = timeAgo(c.createdAt || Date.now());
 
-    const canDelete =
-      currentUser &&
-      (currentUser.id === c.userId ||
-        (post && currentUser.id === post.userId));
+      const canDelete =
+        currentUser &&
+        (currentUser.id === c.userId ||
+          (post && currentUser.id === post.userId));
 
-    const deleteBtnHtml = canDelete
-      ? `
+      const deleteBtnHtml = canDelete
+        ? `
         <button
           type="button"
           class="btn btn-link btn-sm text-danger p-0 ms-2 delete-comment-btn"
@@ -894,10 +893,10 @@ function renderCommentsForPost(postId, commentsSection) {
           Delete
         </button>
       `
-      : "";
+        : "";
 
-    const imageHtml = c.imageDataUrl
-      ? `
+      const imageHtml = c.imageDataUrl
+        ? `
         <div class="mt-1">
           <img
             src="${escapeHtml(c.imageDataUrl)}"
@@ -906,34 +905,38 @@ function renderCommentsForPost(postId, commentsSection) {
           />
         </div>
       `
-      : "";
+        : "";
 
-    // 🔹 Avatar HTML with fixed, round container
-    const avatarHtml = c.avatarDataUrl
-      ? `
+      const displayName = c.name || "Unknown";
+      const displayHandle = c.username || "user";
+      const initials = displayName.charAt(0).toUpperCase();
+
+      const avatarHtml = c.avatarDataUrl
+        ? `
         <div class="comment-avatar">
           <img
             src="${escapeHtml(c.avatarDataUrl)}"
-            alt="${escapeHtml(c.name || "Avatar")}"
+            alt="${escapeHtml(displayName || "Avatar")}"
           />
         </div>
       `
-      : `
+        : `
         <div class="comment-avatar comment-avatar-fallback">
-          ${escapeHtml((c.name || "U").charAt(0).toUpperCase())}
+          ${escapeHtml(initials)}
         </div>
       `;
 
-    item.innerHTML = `
+      const bodyText = c.body ?? c.text ?? "";
+
+      item.innerHTML = `
       <div class="d-flex align-items-start">
         ${avatarHtml}
-
         <div class="flex-grow-1">
           <div class="d-flex justify-content-between align-items-center">
             <div>
-              <strong>${escapeHtml(c.name || "Unknown")}</strong>
+              <strong>${escapeHtml(displayName)}</strong>
               <span class="text-body-secondary ms-1">
-                @${escapeHtml(c.username || "user")}
+                @${escapeHtml(displayHandle)}
               </span>
             </div>
             <div class="d-flex align-items-center">
@@ -941,17 +944,16 @@ function renderCommentsForPost(postId, commentsSection) {
               ${deleteBtnHtml}
             </div>
           </div>
-
           <div class="comment-body">
-            ${escapeHtml(c.body || "")}
+            ${escapeHtml(bodyText)}
           </div>
           ${imageHtml}
         </div>
       </div>
     `;
 
-    listEl.appendChild(item);
-  });
+      listEl.appendChild(item);
+    });
 }
 
 // ===========================
@@ -1183,24 +1185,24 @@ function updateAuthUI() {
         navActionContainer.prepend(userBadge);
       }
 
-          if (!logoutBtn) {
-      logoutBtn = document.createElement("button");
-      logoutBtn.id = "navLogoutBtn";
-      logoutBtn.type = "button";
-      logoutBtn.className = "btn btn-outline-soft btn-sm";
-      logoutBtn.textContent = "Log out";
-      navActionContainer.appendChild(logoutBtn);
+      if (!logoutBtn) {
+        logoutBtn = document.createElement("button");
+        logoutBtn.id = "navLogoutBtn";
+        logoutBtn.type = "button";
+        logoutBtn.className = "btn btn-outline-soft btn-sm";
+        logoutBtn.textContent = "Log out";
+        navActionContainer.appendChild(logoutBtn);
 
-      logoutBtn.addEventListener("click", async () => {
-        try {
-          await signOut(auth);
-        } catch (err) {
-          console.error("Error signing out:", err);
-        }
-        clearCurrentUser();
-        updateAuthUI();
-      });
-    }
+        logoutBtn.addEventListener("click", async () => {
+          try {
+            await signOut(auth);
+          } catch (err) {
+            console.error("Error signing out:", err);
+          }
+          clearCurrentUser();
+          updateAuthUI();
+        });
+      }
     }
 
     if (userBadge) {
@@ -1247,7 +1249,7 @@ function updateAuthUI() {
       composerButton.setAttribute("data-bs-target", "#loginModal");
     }
   }
-    renderFeedFilterBar();
+  renderFeedFilterBar();
 }
 
 // ===========================
@@ -1367,7 +1369,7 @@ if (composerButtonEl && composerInputEl) {
       visibility: "Public",
       likes: 0,
       tags: extractTagsFromText(text),
-      imageDataUrl: imageDataUrl || null, // 👈 store post image
+      imageDataUrl: imageDataUrl || null,
     };
 
     posts.push(newPost);
@@ -1481,9 +1483,6 @@ document.addEventListener("click", async function (e) {
   renderPeopleToFollow();
 });
 
-// ===========================
-//  SIGNUP HANDLER (Firebase Auth)
-// ===========================
 // ===========================
 //  SIGNUP HANDLER (Firebase Auth)
 // ===========================
@@ -1666,11 +1665,8 @@ document.addEventListener("click", async function (e) {
     createdAt: now,
     visibility: "Public",
     likes: 0,
-    // include both your new hashtags and any from the original post
     tags: extractTagsFromText(combinedBody),
-    // carry over the original image if it had one
     imageDataUrl: original.imageDataUrl || null,
-    // optional: track what it was shared from
     sharedFromPostId: original.id,
     sharedFromUserId: original.userId,
   };
@@ -1947,23 +1943,22 @@ document.addEventListener("submit", async function (e) {
 
   const hasFile = fileInput && fileInput.files && fileInput.files[0];
 
-  // If there is a file, try to read it as a data URL
   // If there is a file, try to read & RESIZE it as a data URL
-if (hasFile) {
-  const file = fileInput.files[0];
-  try {
-    imageDataUrl = await resizeImageTo300px(file);
-  } catch (err) {
-    console.error("Error reading comment image on this device:", err);
-    if (!text) {
-      alert(
-        "Your image couldn't be processed on this device. Try a smaller image or add some text."
-      );
-      return;
+  if (hasFile) {
+    const file = fileInput.files[0];
+    try {
+      imageDataUrl = await resizeImageTo300px(file);
+    } catch (err) {
+      console.error("Error reading comment image on this device:", err);
+      if (!text) {
+        alert(
+          "Your image couldn't be processed on this device. Try a smaller image or add some text."
+        );
+        return;
+      }
+      imageDataUrl = null;
     }
-    imageDataUrl = null;
   }
-}
 
   // If no text and no image, do nothing
   if (!text && !imageDataUrl) return;
@@ -1973,9 +1968,11 @@ if (hasFile) {
     id: commentId,
     postId,
     userId: user.id,
-    username: user.username,
     name: user.name,
+    username: user.username,
+    avatarDataUrl: user.avatarDataUrl || null,
     body: text,
+    text: text, // for backward compatibility
     imageDataUrl: imageDataUrl || null,
     createdAt: Date.now(),
   };
