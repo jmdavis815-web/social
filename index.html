@@ -153,7 +153,7 @@
                   class="badge rounded-pill px-3 py-2 mt-1"
                   style="background-color: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent);"
                 >
-                  ● Main Wall · Newest posts first
+                  <p class="mb-0">● Main Wall</p>
                 </div>
               </div>
             </div>
@@ -163,9 +163,9 @@
     </section>
 
     <div class="row">
-    <div class="col-md-4">
+    <div class="col-md-4 col-12">
     <!-- SIDEBAR COLUMN -->
-      <aside aria-label="Sidebar" class="">
+      <aside aria-label="Sidebar" class="sidebar-layout">
         <!-- Popular Topics -->
         <!-- People to Follow -->
         <div class="sidebar-card">
@@ -188,7 +188,8 @@
     </div>
 
     <!-- MAIN FEED LAYOUT -->
-    <main class="feed-layout col-md-8">
+     <div class="col-md-8 col-lg-6">
+    <main class="feed-layout">
       <!-- FEED COLUMN -->
       <section aria-label="Main feed">
         <!-- Composer -->
@@ -221,14 +222,14 @@
   <button
     id="feedFilterFollowing"
     type="button"
-    class="btn btn-main btn-sm"
+    class="btn btn-main btn-sm rounded-4"
   >
     Following
   </button>
   <button
     id="feedFilterAll"
     type="button"
-    class="btn btn-outline-soft btn-sm"
+    class="btn btn-outline-soft btn-sm rounded-4"
   >
     All
   </button>
@@ -249,10 +250,11 @@
         </div>
 
         <!-- DYNAMIC FEED WILL GO HERE -->
-        <div id="postList"></div>
+        <div id="postList" class=""></div>
       </section>
 
     </main>
+    </div>
     </div>
 
     <!-- FOOTER -->

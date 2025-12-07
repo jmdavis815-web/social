@@ -186,16 +186,8 @@ body {
    ============== */
 
 .feed-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 2.2fr) minmax(260px, 1fr);
-  gap: 1.5rem;
-  margin-top: 1.5rem;
-}
-
-@media (max-width: 900px) {
-  .feed-layout {
-    grid-template-columns: minmax(0, 1fr);
-  }
+  /* kill the grid for this layout */
+  display: block;
 }
 
 /* Composer (index hero composer) */
@@ -249,6 +241,7 @@ body {
   border: 1px solid var(--card-border);
   padding: 1rem 1.2rem 0.8rem;
   margin-bottom: 1rem;
+  width: 100%;
 }
 
 /* Avatars */
@@ -453,8 +446,6 @@ body {
    ============== */
 
 .profile-layout {
-  display: flex;
-  flex-direction: column;
   gap: 1rem;
 }
 
@@ -722,6 +713,14 @@ small.text-body-secondary {
   height: auto;
   border-radius: 0.75rem;
   display: block;
+}
+
+#mainFeed {
+  width: 100%;
+}
+
+#sideCol {
+  width: 100%;
 }
 
 
