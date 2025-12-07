@@ -94,7 +94,7 @@
   </nav>
 
   <!-- PAGE WRAPPER -->
-  <div class="page-wrapper">
+  <div class="page-wrapper container">
 
     <!-- HERO / INTRO -->
     <section class="hero">
@@ -156,8 +156,33 @@
       </div>
     </section>
 
+    <div class="row">
+    <div class="col-md-4">
+    <!-- SIDEBAR COLUMN -->
+      <aside aria-label="Sidebar" class="">
+        <!-- Popular Topics -->
+        <!-- People to Follow -->
+        <div class="sidebar-card">
+          <div class="sidebar-title">People to follow</div>
+          <div id="peopleToFollow"></div>
+          <small class="text-body-secondary d-block mt-2">
+            Suggestions are based on users whose posts collect likes.
+          </small>
+        </div>
+
+        <div class="sidebar-card">
+          <div class="sidebar-title">Popular topics</div>
+          <div class="mb-2" id="popularTopics"></div>
+          <small class="text-body-secondary d-block">
+            Click a topic to filter the wall by hashtag.
+            Topics with the most likes float to the top.
+          </small>
+        </div>
+      </aside>
+    </div>
+
     <!-- MAIN FEED LAYOUT -->
-    <main class="feed-layout">
+    <main class="feed-layout col-md-8">
       <!-- FEED COLUMN -->
       <section aria-label="Main feed">
         <!-- Composer -->
@@ -221,39 +246,8 @@
         <div id="postList"></div>
       </section>
 
-      <!-- SIDEBAR COLUMN -->
-      <aside aria-label="Sidebar">
-        <!-- Popular Topics -->
-        <div class="sidebar-card">
-          <div class="sidebar-title">Popular topics</div>
-          <div class="mb-2" id="popularTopics"></div>
-          <small class="text-body-secondary d-block">
-            Click a topic to filter the wall by hashtag.
-            Topics with the most likes float to the top.
-          </small>
-        </div>
-
-        <!-- People to Follow -->
-        <div class="sidebar-card">
-          <div class="sidebar-title">People to follow</div>
-          <div id="peopleToFollow"></div>
-          <small class="text-body-secondary d-block mt-2">
-            Suggestions are based on users whose posts collect likes.
-          </small>
-        </div>
-
-        <!-- “What’s next to build?” helper -->
-        <div class="sidebar-card">
-          <div class="sidebar-title">What’s next to build?</div>
-          <ol class="mb-0 ps-3 text-body-secondary">
-            <li>Sign-up &amp; login (auth system).</li>
-            <li>Database for posts and users.</li>
-            <li>API endpoints to load and create posts.</li>
-            <li>Replace sample posts with live data.</li>
-          </ol>
-        </div>
-      </aside>
     </main>
+    </div>
 
     <!-- FOOTER -->
     <footer class="page-footer py-3 mt-4 border-top small text-center">

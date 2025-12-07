@@ -7,6 +7,7 @@ import {
   collection,
   doc,
   getDocs,
+  getDoc,
   setDoc,
   addDoc,
   updateDoc,
@@ -15,6 +16,13 @@ import {
   where,
   orderBy,
 } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+import {
+  getAuth,
+  onAuthStateChanged,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut,
+} from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
 
 // 🔹 Your Firebase web config
 const firebaseConfig = {
@@ -28,6 +36,7 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const auth = getAuth(app);
 
 // Collections
 const usersCol = collection(db, "users");
@@ -948,57 +957,12 @@ function renderCommentsForPost(postId, commentsSection) {
 // ===========================
 //  FIRESTORE SYNC
 // ===========================
-async function syncUsersFromFirestore() {
-  const usersSnap = await getDocs(usersCol);
-  let users = [];
-
-  if (usersSnap.empty) {
-    // Seed demo users into Firestore
-    users = [
-      {
-        id: 1,
-        name: "Michael",
-        username: "michael",
-        email: "michael@example.com",
-        password: "demo",
-      },
-      {
-        id: 2,
-        name: "Alex Smith",
-        username: "alex",
-        email: "alex@example.com",
-        password: "demo",
-      },
-      {
-        id: 3,
-        name: "Jordan",
-        username: "jordan",
-        email: "jordan@example.com",
-        password: "demo",
-      },
-    ];
-
-    for (const u of users) {
-      await setDoc(doc(usersCol, String(u.id)), u);
-    }
-  } else {
-    users = usersSnap.docs.map((d) => {
-      const data = d.data();
-      return {
-        id: data.id ?? Number(d.id),
-        ...data,
-      };
-    });
-  }
-
-  saveUsers(users);
-}
-
 async function syncPostsFromFirestore() {
   const postsSnap = await getDocs(query(postsCol, orderBy("createdAt", "desc")));
   let posts = [];
 
   if (postsSnap.empty) {
+    // Demo posts ONLY in localStorage (do NOT write to Firestore)
     const now = Date.now();
     posts = [
       {
@@ -1038,10 +1002,6 @@ async function syncPostsFromFirestore() {
         tags: ["randomthoughts"],
       },
     ];
-
-    for (const p of posts) {
-      await setDoc(doc(postsCol, String(p.id)), p);
-    }
   } else {
     posts = postsSnap.docs.map((d) => {
       const data = d.data();
@@ -1080,6 +1040,45 @@ async function syncCommentsFromFirestore() {
     map[key].push(c);
   });
   saveCommentsMap(map);
+}
+
+async function syncUsersFromFirestore() {
+  const usersSnap = await getDocs(usersCol);
+  let users = [];
+
+  if (usersSnap.empty) {
+    // Demo users ONLY in localStorage (do NOT write to Firestore)
+    users = [
+      {
+        id: 1,
+        name: "Michael",
+        username: "michael",
+        email: "michael@example.com",
+      },
+      {
+        id: 2,
+        name: "Alex Smith",
+        username: "alex",
+        email: "alex@example.com",
+      },
+      {
+        id: 3,
+        name: "Jordan",
+        username: "jordan",
+        email: "jordan@example.com",
+      },
+    ];
+  } else {
+    users = usersSnap.docs.map((d) => {
+      const data = d.data();
+      return {
+        id: data.id ?? d.id,
+        ...data,
+      };
+    });
+  }
+
+  saveUsers(users);
 }
 
 // ===========================
@@ -1184,19 +1183,24 @@ function updateAuthUI() {
         navActionContainer.prepend(userBadge);
       }
 
-      if (!logoutBtn) {
-        logoutBtn = document.createElement("button");
-        logoutBtn.id = "navLogoutBtn";
-        logoutBtn.type = "button";
-        logoutBtn.className = "btn btn-outline-soft btn-sm";
-        logoutBtn.textContent = "Log out";
-        navActionContainer.appendChild(logoutBtn);
+          if (!logoutBtn) {
+      logoutBtn = document.createElement("button");
+      logoutBtn.id = "navLogoutBtn";
+      logoutBtn.type = "button";
+      logoutBtn.className = "btn btn-outline-soft btn-sm";
+      logoutBtn.textContent = "Log out";
+      navActionContainer.appendChild(logoutBtn);
 
-        logoutBtn.addEventListener("click", () => {
-          clearCurrentUser();
-          updateAuthUI();
-        });
-      }
+      logoutBtn.addEventListener("click", async () => {
+        try {
+          await signOut(auth);
+        } catch (err) {
+          console.error("Error signing out:", err);
+        }
+        clearCurrentUser();
+        updateAuthUI();
+      });
+    }
     }
 
     if (userBadge) {
@@ -1261,6 +1265,49 @@ function updateAuthUI() {
   initPosts();
   updateAuthUI();
 })();
+
+// ===========================
+//  AUTH STATE LISTENER
+// ===========================
+onAuthStateChanged(auth, async (fbUser) => {
+  if (!fbUser) {
+    // Signed out
+    clearCurrentUser();
+    updateAuthUI();
+    return;
+  }
+
+  const uid = fbUser.uid;
+
+  try {
+    const userDoc = await getDoc(doc(usersCol, uid));
+
+    let user;
+    if (userDoc.exists()) {
+      const data = userDoc.data();
+      user = {
+        id: uid,
+        ...data,
+      };
+    } else {
+      // Fallback: create a basic profile if somehow missing
+      user = {
+        id: uid,
+        name: fbUser.displayName || "New User",
+        username:
+          fbUser.email?.split("@")[0] || `user-${uid.slice(0, 6)}`,
+        email: fbUser.email || "",
+        createdAt: Date.now(),
+      };
+      await setDoc(doc(usersCol, uid), user);
+    }
+
+    setCurrentUser(user);
+    updateAuthUI();
+  } catch (err) {
+    console.error("Error in onAuthStateChanged profile sync:", err);
+  }
+});
 
 // ===========================
 //  COMPOSER HANDLER (CREATE POST)
@@ -1435,7 +1482,10 @@ document.addEventListener("click", async function (e) {
 });
 
 // ===========================
-//  SIGNUP HANDLER (Firestored)
+//  SIGNUP HANDLER (Firebase Auth)
+// ===========================
+// ===========================
+//  SIGNUP HANDLER (Firebase Auth)
 // ===========================
 const signupForm = document.getElementById("signupForm");
 if (signupForm) {
@@ -1459,27 +1509,26 @@ if (signupForm) {
     }
 
     try {
-      // Check if email already exists in Firestore
-      const q = query(usersCol, where("email", "==", email));
-      const snap = await getDocs(q);
-      if (!snap.empty) {
-        alert("An account with that email already exists. Try logging in.");
-        return;
-      }
+      // 1) Create Firebase Auth user
+      const cred = await createUserWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
+      const uid = cred.user.uid;
 
-      const id = Date.now(); // numeric id
+      // 2) Create profile doc in Firestore
       const newUser = {
-        id,
+        id: uid,
         name,
         username,
         email,
-        password, // demo only (not secure)
+        createdAt: Date.now(),
       };
 
-      // Save to Firestore
-      await setDoc(doc(usersCol, String(id)), newUser);
+      await setDoc(doc(usersCol, uid), newUser);
 
-      // Update local cache
+      // 3) Save locally & update UI
       const users = loadUsers();
       users.push(newUser);
       saveUsers(users);
@@ -1498,13 +1547,13 @@ if (signupForm) {
       signupForm.reset();
     } catch (err) {
       console.error("Error signing up:", err);
-      alert("There was an error creating your account. Please try again.");
+      alert(err.message || "There was an error creating your account.");
     }
   });
 }
 
 // ===========================
-//  LOGIN HANDLER (Firestored)
+//  LOGIN HANDLER (Firebase Auth)
 // ===========================
 const loginForm = document.getElementById("loginForm");
 if (loginForm) {
@@ -1525,41 +1574,10 @@ if (loginForm) {
     }
 
     try {
-      const q = query(
-        usersCol,
-        where("email", "==", email),
-        where("password", "==", password)
-      );
-      const snap = await getDocs(q);
+      // Firebase Auth handles password verification
+      await signInWithEmailAndPassword(auth, email, password);
 
-      if (snap.empty) {
-        alert(
-          "No matching account found. Check your credentials or sign up."
-        );
-        return;
-      }
-
-      const docSnap = snap.docs[0];
-      const data = docSnap.data();
-      const user = {
-        id: data.id ?? Number(docSnap.id),
-        ...data,
-      };
-
-      setCurrentUser(user);
-
-      // Update local user cache (merge/update)
-      const users = loadUsers();
-      const idx = users.findIndex((u) => u.id == user.id);
-      if (idx === -1) {
-        users.push(user);
-      } else {
-        users[idx] = user;
-      }
-      saveUsers(users);
-
-      updateAuthUI();
-
+      // onAuthStateChanged will fire and load the profile
       const loginModalEl = document.getElementById("loginModal");
       if (loginModalEl && typeof bootstrap !== "undefined") {
         const modalInstance =
@@ -1571,16 +1589,13 @@ if (loginForm) {
       loginForm.reset();
     } catch (err) {
       console.error("Error logging in:", err);
-      alert("There was an error during login. Please try again.");
+      alert(err.message || "There was an error during login. Please try again.");
     }
   });
 }
 
 // ===========================
-//  SHARE BUTTON (copy link / Web Share API)
-// ===========================
-// ===========================
-//  SHARE BUTTON — REPOST WITH COMMENT (like Facebook)
+//  SHARE BUTTON — REPOST WITH COMMENT
 // ===========================
 document.addEventListener("click", async function (e) {
   const btn = e.target.closest(".share-btn");
