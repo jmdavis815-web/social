@@ -1606,6 +1606,9 @@ document.addEventListener("click", async function (e) {
 // ===========================
 //  FOLLOW / UNFOLLOW ON PROFILE
 // ===========================
+// ===========================
+//  FOLLOW / UNFOLLOW ON PROFILE
+// ===========================
 document.addEventListener("click", async function (e) {
   const btn = e.target.closest("[data-follow-target-id]");
   if (!btn) return;
@@ -1616,8 +1619,8 @@ document.addEventListener("click", async function (e) {
     return;
   }
 
-  const targetId = Number(btn.getAttribute("data-follow-target-id"));
-  if (!targetId || targetId === current.id) return;
+  const targetId = btn.getAttribute("data-follow-target-id"); // 👈 no Number()
+  if (!targetId || String(targetId) === String(current.id)) return;
 
   const nowFollowing = toggleFollowLocal(current.id, targetId);
 
@@ -1626,15 +1629,15 @@ document.addEventListener("click", async function (e) {
   btn.classList.toggle("btn-outline-soft", !nowFollowing);
 
   const profileUser = getProfileUser();
-  const isOwnProfile = profileUser && profileUser.id === current.id;
+  const isOwnProfile = profileUser && String(profileUser.id) === String(current.id);
 
   // 🔹 Firestore follows
   const followDocId = `${current.id}_${targetId}`;
   try {
     if (nowFollowing) {
       await setDoc(doc(followsCol, followDocId), {
-        followerId: current.id,
-        targetId,
+        followerId: String(current.id),
+        targetId: String(targetId),
         createdAt: Date.now(),
       });
     } else {
@@ -1873,4 +1876,37 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   renderProfile();
+});
+
+document.addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-follow-user-id], [data-follow-target-id]");
+  if (!btn) return;
+
+  const currentUser = getCurrentUser();
+  if (!currentUser) {
+    showToastError("You must be logged in to follow users.");
+    return;
+  }
+
+  const targetId =
+    btn.dataset.followUserId || btn.dataset.followTargetId;
+
+  const nowFollowing = toggleFollowLocal(currentUser.id, Number(targetId));
+
+  // Update button label + style
+  btn.textContent = nowFollowing ? "Following" : "Follow";
+  btn.classList.toggle("btn-main", nowFollowing);
+  btn.classList.toggle("btn-outline-soft", !nowFollowing);
+
+  // Optional: Sync to Firestore
+  // await setDoc(doc(followsCol), { followerId: currentUser.id, targetId });
+
+  // Refresh profile header if on profile page
+  if (typeof renderProfileHeader === "function") {
+    const user = getProfileUser();
+    const isOwnProfile = currentUser.id === user.id;
+    renderProfileHeader(user, isOwnProfile);
+  }
+
+  showToastSuccess(nowFollowing ? "Following user" : "Unfollowed");
 });

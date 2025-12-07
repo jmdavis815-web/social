@@ -305,30 +305,49 @@ function getFollowingIds(userId) {
   return Array.isArray(entry) ? entry : [];
 }
 
+function getFollowerIds(userId) {
+  if (!userId) return [];
+  const map = loadFollows();
+  const targetKey = String(userId);
+  const followers = [];
+
+  for (const [followerId, followingList] of Object.entries(map)) {
+    if (Array.isArray(followingList) && followingList.includes(targetKey)) {
+      followers.push(followerId); // keep as string; we only need counts
+    }
+  }
+  return followers;
+}
+
 function isFollowing(followerId, targetId) {
   if (!followerId || !targetId) return false;
-  const following = getFollowingIds(followerId);
-  return following.includes(targetId);
+  const targetKey = String(targetId);
+  const following = getFollowingIds(followerId).map(String);
+  return following.includes(targetKey);
 }
 
 function toggleFollowLocal(followerId, targetId) {
-  if (!followerId || !targetId || followerId === targetId) return false;
+  if (!followerId || !targetId || String(followerId) === String(targetId)) {
+    return false;
+  }
 
   const map = loadFollows();
-  const key = String(followerId);
-  const list = Array.isArray(map[key]) ? map[key] : [];
+  const followerKey = String(followerId);
+  const targetKey = String(targetId);
 
-  const idx = list.indexOf(targetId);
+  let list = Array.isArray(map[followerKey]) ? map[followerKey] : [];
+
+  const idx = list.indexOf(targetKey);
   let nowFollowing;
   if (idx === -1) {
-    list.push(targetId);
+    list.push(targetKey);
     nowFollowing = true;
   } else {
     list.splice(idx, 1);
     nowFollowing = false;
   }
 
-  map[key] = list;
+  map[followerKey] = list;
   saveFollows(map);
   return nowFollowing;
 }
@@ -1021,9 +1040,10 @@ async function syncFollowsFromFirestore() {
   const snap = await getDocs(followsCol);
   const map = {};
   snap.forEach((d) => {
-    const data = d.data();
-    const followerId = String(data.followerId);
-    const targetId = data.targetId;
+    const f = d.data();
+    const followerId = String(f.followerId);
+    const targetId = String(f.targetId); // 👈 make sure this is string
+
     if (!map[followerId]) map[followerId] = [];
     if (!map[followerId].includes(targetId)) {
       map[followerId].push(targetId);
@@ -1780,8 +1800,8 @@ document.addEventListener("click", async function (e) {
     return;
   }
 
-  const targetId = Number(btn.getAttribute("data-follow-user-id"));
-  if (!targetId || targetId === current.id) return;
+  const targetId = btn.getAttribute("data-follow-user-id"); // 👈 no Number()
+  if (!targetId || String(targetId) === String(current.id)) return;
 
   // Local toggle
   const nowFollowing = toggleFollowLocal(current.id, targetId);
@@ -1795,8 +1815,8 @@ document.addEventListener("click", async function (e) {
   try {
     if (nowFollowing) {
       await setDoc(doc(followsCol, followDocId), {
-        followerId: current.id,
-        targetId,
+        followerId: String(current.id),
+        targetId: String(targetId),
         createdAt: Date.now(),
       });
     } else {
@@ -2070,3 +2090,37 @@ function updateAuthButtons() {
     logoutBtn.style.display = "none";
   }
 }
+
+document.addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-follow-user-id], [data-follow-target-id]");
+  if (!btn) return;
+
+  const currentUser = getCurrentUser();
+  if (!currentUser) {
+    showToastError("You must be logged in to follow users.");
+    return;
+  }
+
+  const targetId =
+    btn.dataset.followUserId || btn.dataset.followTargetId;
+
+  const nowFollowing = toggleFollowLocal(currentUser.id, Number(targetId));
+
+  // Update button label + style
+  btn.textContent = nowFollowing ? "Following" : "Follow";
+  btn.classList.toggle("btn-main", nowFollowing);
+  btn.classList.toggle("btn-outline-soft", !nowFollowing);
+
+  // Optional: Sync to Firestore
+  // await setDoc(doc(followsCol), { followerId: currentUser.id, targetId });
+
+  // Refresh profile header if on profile page
+  if (typeof renderProfileHeader === "function") {
+    const user = getProfileUser();
+    const isOwnProfile = currentUser.id === user.id;
+    renderProfileHeader(user, isOwnProfile);
+  }
+
+  showToastSuccess(nowFollowing ? "Following user" : "Unfollowed");
+});
+
