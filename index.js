@@ -1195,41 +1195,70 @@ function updateAuthUI() {
       : document.querySelector(".navbar .d-flex.align-items-center.gap-2");
 
     if (navActionContainer) {
-      if (!userBadge) {
-        userBadge = document.createElement("a");
-        userBadge.id = "navUserBadge";
-        userBadge.className = "badge rounded-pill px-3 py-2 me-1";
-        userBadge.style.backgroundColor = "var(--accent-soft)";
-        userBadge.style.color = "var(--accent)";
-        userBadge.style.textDecoration = "none";
-        navActionContainer.prepend(userBadge);
-      }
+  if (!userBadge) {
+    userBadge = document.createElement("a");
+    userBadge.id = "navUserBadge";
+    userBadge.className = "avatar-link me-1";
+    userBadge.style.display = "inline-flex";
+    userBadge.style.alignItems = "center";
+    userBadge.style.justifyContent = "center";
+    userBadge.style.textDecoration = "none";
+    navActionContainer.prepend(userBadge);
+  }
 
-      if (!logoutBtn) {
-        logoutBtn = document.createElement("button");
-        logoutBtn.id = "navLogoutBtn";
-        logoutBtn.type = "button";
-        logoutBtn.className = "btn btn-outline-soft btn-sm";
-        logoutBtn.textContent = "Log out";
-        navActionContainer.appendChild(logoutBtn);
+  if (!logoutBtn) {
+    logoutBtn = document.createElement("button");
+    logoutBtn.id = "navLogoutBtn";
+    logoutBtn.type = "button";
+    logoutBtn.className = "btn btn-outline-soft btn-sm";
+    logoutBtn.textContent = "Log out";
+    navActionContainer.appendChild(logoutBtn);
 
-        logoutBtn.addEventListener("click", async () => {
-          try {
-            await signOut(auth);
-          } catch (err) {
-            console.error("Error signing out:", err);
-          }
-          clearCurrentUser();
-          updateAuthUI();
-        });
+    logoutBtn.addEventListener("click", async () => {
+      try {
+        await signOut(auth);
+      } catch (err) {
+        console.error("Error signing out:", err);
       }
-    }
+      clearCurrentUser();
+      updateAuthUI();
+    });
+  }
+}
 
     if (userBadge) {
-      userBadge.textContent = `@${user.username}`;
-      userBadge.href = `profile.html?userId=${encodeURIComponent(user.id)}`;
-      userBadge.style.cursor = "pointer";
-    }
+  const avatarUrl = user.avatarDataUrl || user.avatar || null;
+  const displayName = user.name || user.username || "User";
+  const initials =
+    (displayName || "")
+      .split(" ")
+      .filter(Boolean)
+      .map((n) => n[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase() || "U";
+
+  const avatarHtml = avatarUrl
+    ? `
+      <div class="mini-avatar">
+        <img
+          src="${escapeHtml(avatarUrl)}"
+          alt="${escapeHtml(initials)}"
+          class="post-avatar-img"
+        />
+      </div>
+    `
+    : `
+      <div class="mini-avatar">
+        ${escapeHtml(initials)}
+      </div>
+    `;
+
+  userBadge.innerHTML = avatarHtml;
+  userBadge.href = `profile.html?userId=${encodeURIComponent(user.id)}`;
+  userBadge.title = `${displayName} (@${user.username})`;
+  userBadge.style.cursor = "pointer";
+}
 
     if (composerInput) {
       composerInput.disabled = false;

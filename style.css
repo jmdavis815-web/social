@@ -262,8 +262,7 @@ body {
   color: var(--accent);
 }
 
-.post-avatar,
-.profile-header .post-avatar {
+.post-avatar, .post-avatar {
   min-width: 48px;
 }
 
@@ -280,8 +279,8 @@ body {
 /* Mini avatar used in sidebar etc. */
 
 .mini-avatar {
-  width: 28px;
-  height: 28px;
+  width: 42px;
+  height: 42px;
   font-size: 0.7rem;
   margin-right: 0.4rem;
 }
@@ -569,8 +568,8 @@ small.text-body-secondary {
 
 /* Make sure avatar in header looks solid */
 #profileHeader .post-avatar {
-  width: 60px;
-  height: 60px;
+  width: 125px;
+  height: 125px;
   font-size: 1.2rem;
 }
 
