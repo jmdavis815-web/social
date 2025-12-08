@@ -1847,9 +1847,14 @@ document.addEventListener("click", function (e) {
   }
 });
 
+// ===========================
+//  COMMENT SUBMIT (Profile page posts)
+// ===========================
 document.addEventListener("submit", async function (e) {
   const form = e.target.closest(".comment-form");
   if (!form) return;
+
+  // ✅ Only handle comment forms inside the profile posts card
   if (!form.closest("#profilePosts")) return;
 
   e.preventDefault();
@@ -1873,29 +1878,30 @@ document.addEventListener("submit", async function (e) {
 
   const hasFile = fileInput && fileInput.files && fileInput.files[0];
 
-  // If there is a file, try to read & resize it as a data URL
-if (hasFile) {
-  const file = fileInput.files[0];
-  try {
-    // ⬇️ use the resize helper instead of the full image
-    imageDataUrl = await resizeImageTo300px(file);
-  } catch (err) {
-    console.error("Error reading comment image on this device:", err);
-    // If the user put text, we still post the text-only comment.
-    if (!text) {
-      alert(
-        "Your image couldn't be processed on this device. Try a smaller image or add some text."
-      );
-      return;
+  // 🔹 If there is a file, try to read & resize it as a data URL
+  if (hasFile) {
+    const file = fileInput.files[0];
+    try {
+      imageDataUrl = await resizeImageTo300px(file);
+    } catch (err) {
+      console.error("Error reading comment image on this device:", err);
+      // If the user put text, we still post the text-only comment.
+      if (!text) {
+        alert(
+          "Your image couldn't be processed on this device. Try a smaller image or add some text."
+        );
+        return;
+      }
+      imageDataUrl = null;
     }
-    imageDataUrl = null;
   }
-}
 
-  // Must have either text or image
+  // ❗ Must have either text or image
   if (!text && !imageDataUrl) return;
 
-    const commentId = Date.now();
+  const now = Date.now();
+  const commentId = now;
+
   const comment = {
     id: commentId,
     postId,
@@ -1904,46 +1910,59 @@ if (hasFile) {
     name: user.name,
     body: text,
     imageDataUrl: imageDataUrl || null,
-    createdAt: Date.now(),
+    createdAt: now,
   };
 
   // 🔔 Create a notification for the post owner (if it's not you)
   const posts = loadPosts();
   const post = posts.find((p) => p.id === postId);
 
-  if (post && user.id !== post.userId) {
-    addNotification(post.userId, {
-      postId: post.id,
-      commenterId: user.id,
-      commenterName: user.name,
-      text: comment.body,
-      timestamp: Date.now(),
-    });
+  if (post && String(user.id) !== String(post.userId)) {
+    try {
+      await addNotification(post.userId, {
+        type: "comment",           // 👈 match index.js
+        postId,
+        commenterId: user.id,
+        commenterName: user.name,
+        text,                      // use original text string
+        timestamp: now,
+      });
+    } catch (err) {
+      console.error("Error adding notification:", err);
+    }
 
-    // If YOU are the owner and you're on your profile page, your badge will update
+    // Badge updates for whoever is currently logged in on this device
     updateNotificationBadge();
   }
 
-  // Local
+  // ✅ Local storage
   addCommentToLocal(postId, comment);
 
-  // Firestore
+  // ✅ Firestore
   try {
     await setDoc(doc(commentsCol, String(commentId)), comment);
   } catch (err) {
     console.error("Error writing comment to Firestore:", err);
   }
 
+  // Re-render the comments for this post
   const commentsSection = article.querySelector(".post-comments");
   if (commentsSection) {
     renderCommentsForPost(postId, commentsSection);
   }
 
+  // Update comment count badge
   const countEl = article.querySelector(".comment-btn .comment-count");
   if (countEl) {
     let currentCount = parseInt(countEl.textContent || "0", 10) || 0;
     currentCount += 1;
     countEl.textContent = currentCount;
+  }
+
+  // Clear the form
+  input.value = "";
+  if (fileInput) {
+    fileInput.value = "";
   }
 });
 
