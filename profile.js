@@ -17,6 +17,10 @@ import {
   where,
   orderBy
 } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+import {
+  getAuth,
+  onAuthStateChanged,
+} from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
 
 // 🔹 Same config as index.js
 const firebaseConfig = {
@@ -30,6 +34,13 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+// Initialize Auth so Firestore gets the auth token on this page too
+const auth = getAuth(app);
+
+// Optional: just for debugging, you can see if it’s picking up your login
+onAuthStateChanged(auth, (user) => {
+  console.log("Profile page auth user:", user ? user.uid : "no user");
+});
 
 // Firestore collections
 const usersCol = collection(db, "users");
