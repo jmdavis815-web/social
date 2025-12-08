@@ -2024,33 +2024,6 @@ if (signupForm) {
 }
 
 // ===========================
-//  GOOGLE LOGIN HANDLER
-// ===========================
-async function loginWithGoogle() {
-  try {
-    // Open Google popup
-    await signInWithPopup(auth, googleProvider);
-
-    // onAuthStateChanged will create / load the profile for us
-
-    // Close login modal if it’s open
-    const loginModalEl = document.getElementById("loginModal");
-    if (loginModalEl && typeof bootstrap !== "undefined") {
-      const modalInstance =
-        bootstrap.Modal.getInstance(loginModalEl) ||
-        new bootstrap.Modal(loginModalEl);
-      modalInstance.hide();
-    }
-  } catch (err) {
-    console.error("Google login error:", err);
-    alert(err.message || "Google sign-in failed. Please try again.");
-  }
-}
-
-// Make available to inline HTML onclick
-window.loginWithGoogle = loginWithGoogle;
-
-// ===========================
 //  LOGIN HANDLER (Firebase Auth)
 // ===========================
 const loginForm = document.getElementById("loginForm");
@@ -2091,6 +2064,33 @@ if (loginForm) {
     }
   });
 }
+
+// ===========================
+//  GOOGLE LOGIN HANDLER
+// ===========================
+async function loginWithGoogle() {
+  try {
+    // Open Google popup
+    await signInWithPopup(auth, googleProvider);
+
+    // onAuthStateChanged will create / load the profile for us
+
+    // Close login modal if it’s open
+    const loginModalEl = document.getElementById("loginModal");
+    if (loginModalEl && typeof bootstrap !== "undefined") {
+      const modalInstance =
+        bootstrap.Modal.getInstance(loginModalEl) ||
+        new bootstrap.Modal(loginModalEl);
+      modalInstance.hide();
+    }
+  } catch (err) {
+    console.error("Google login error:", err);
+    alert(err.message || "Google sign-in failed. Please try again.");
+  }
+}
+
+// Make available to inline HTML onclick
+window.loginWithGoogle = loginWithGoogle;
 
 // ===========================
 //  SHARE BUTTON — REPOST WITH COMMENT
