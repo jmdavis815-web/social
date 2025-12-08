@@ -139,47 +139,150 @@
                     </div>
 
                     <form id="editProfileForm" class="row g-3">
-                      <div class="col-md-6">
-                        <label for="editName" class="form-label small mb-1">Name</label>
-                        <input type="text" id="editName" class="form-control form-control-sm" />
-                      </div>
+  <!-- Name -->
+  <div class="col-md-6">
+    <label for="editName" class="form-label small mb-1">Name</label>
+    <input type="text" id="editName" class="form-control form-control-sm" />
+  </div>
 
-                      <div class="col-md-6">
-                        <label for="editUsername" class="form-label small mb-1">Username</label>
-                        <input type="text" id="editUsername" class="form-control form-control-sm" />
-                      </div>
+  <!-- Username -->
+  <div class="col-md-6">
+    <label for="editUsername" class="form-label small mb-1">Username</label>
+    <input type="text" id="editUsername" class="form-control form-control-sm" />
+  </div>
 
-                      <div class="col-md-6">
-                        <label for="editLocation" class="form-label small mb-1">Location</label>
-                        <input type="text" id="editLocation" class="form-control form-control-sm" />
-                      </div>
+  <!-- Location -->
+  <div class="col-md-6">
+    <label for="editLocation" class="form-label small mb-1">Location</label>
+    <input type="text" id="editLocation" class="form-control form-control-sm" />
+  </div>
 
-                      <div class="col-md-6">
-                        <label for="editWebsite" class="form-label small mb-1">Website</label>
-                        <input type="url" id="editWebsite" class="form-control form-control-sm" placeholder="https://example.com" />
-                      </div>
+  <!-- Website -->
+  <div class="col-md-6">
+    <label for="editWebsite" class="form-label small mb-1">Website</label>
+    <input
+      type="url"
+      id="editWebsite"
+      class="form-control form-control-sm"
+      placeholder="https://example.com"
+    />
+  </div>
 
-                      <div class="col-12">
-                        <label for="editBio" class="form-label small mb-1">Bio</label>
-                        <textarea id="editBio" rows="3" class="form-control form-control-sm"></textarea>
-                      </div>
+  <!-- Bio -->
+  <div class="col-12">
+    <label for="editBio" class="form-label small mb-1">Bio</label>
+    <textarea
+      id="editBio"
+      rows="3"
+      class="form-control form-control-sm"
+    ></textarea>
+  </div>
 
-                      <div class="col-12">
-                        <label class="form-label small mb-1" for="editAvatarInput">
-                          Profile picture
-                        </label>
-                        <input type="file" id="editAvatarInput" class="form-control form-control-sm" accept="image/*" />
-                      </div>
+  <!-- Avatar upload -->
+  <div class="col-12">
+    <label class="form-label small mb-1" for="editAvatarInput">
+      Profile picture
+    </label>
+    <input
+      type="file"
+      id="editAvatarInput"
+      class="form-control form-control-sm"
+      accept="image/*"
+    />
+  </div>
 
-                      <div class="col-md-6">
-                        <label for="editBgColor" class="form-label small mb-1">Profile Background Color</label>
-                        <input type="color" id="editBgColor" class="form-control form-control-color" />
-                      </div>
+  <!-- BACKGROUND CONTROLS -->
+  <div class="col-md-6">
+    <label for="editBgMode" class="form-label small mb-1">
+      Background style
+    </label>
+    <select id="editBgMode" class="form-select form-select-sm">
+      <option value="solid">Solid color</option>
+      <option value="preset">Preset theme</option>
+      <option value="gradient">Animated gradient</option>
+      <option value="pattern">Pattern</option>
+      <option value="image">Upload image</option>
+    </select>
+    <small class="text-body-secondary d-block mt-1">
+      Choose how your profile page background looks for everyone.
+    </small>
+  </div>
 
-                      <div class="col-12 d-flex justify-content-end">
-                        <button type="submit" class="btn btn-main btn-sm">Save changes</button>
-                      </div>
-                    </form>
+  <!-- Solid color -->
+  <div class="col-md-6">
+    <label for="editBgColor" class="form-label small mb-1">
+      Solid background color
+    </label>
+    <input
+      type="color"
+      id="editBgColor"
+      class="form-control form-control-color"
+    />
+  </div>
+
+  <!-- Preset theme -->
+  <div class="col-md-6">
+    <label for="editBgPreset" class="form-label small mb-1">
+      Preset theme
+    </label>
+    <select id="editBgPreset" class="form-select form-select-sm">
+      <option value="">None</option>
+      <option value="galaxy">Galaxy</option>
+      <option value="forest">Forest</option>
+      <option value="sunset">Sunset</option>
+      <option value="neon">Neon Grid</option>
+      <option value="witchy">Witchy Moon</option>
+      <option value="cyber">Cyber Fade</option>
+    </select>
+  </div>
+
+  <!-- Gradient -->
+  <div class="col-md-6">
+    <label for="editBgGradient" class="form-label small mb-1">
+      Gradient style
+    </label>
+    <select id="editBgGradient" class="form-select form-select-sm">
+      <option value="">None</option>
+      <option value="aurora">Aurora Flow</option>
+      <option value="sunrise">Sunrise Glow</option>
+      <option value="ocean">Deep Ocean</option>
+    </select>
+  </div>
+
+  <!-- Pattern -->
+  <div class="col-md-6">
+    <label for="editBgPattern" class="form-label small mb-1">
+      Pattern
+    </label>
+    <select id="editBgPattern" class="form-select form-select-sm">
+      <option value="">None</option>
+      <option value="stars">Starfield</option>
+      <option value="grid">Soft grid</option>
+      <option value="weave">Woven cloth</option>
+    </select>
+  </div>
+
+  <!-- Background image -->
+  <div class="col-md-6">
+    <label for="editBgImage" class="form-label small mb-1">
+      Background image
+    </label>
+    <input
+      type="file"
+      id="editBgImage"
+      class="form-control form-control-sm"
+      accept="image/*"
+    />
+    <small class="text-body-secondary d-block mt-1">
+      Large, soft images work best. This is stored and shown to everyone.
+    </small>
+  </div>
+
+  <!-- Save button -->
+  <div class="col-12 d-flex justify-content-end">
+    <button type="submit" class="btn btn-main btn-sm">Save changes</button>
+  </div>
+</form>
 
                   </div>
                 </div>

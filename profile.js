@@ -561,14 +561,128 @@ function computeUserTopics(userId) {
 }
 
 // ===========================
-//  RENDER PROFILE HEADER
+//  PROFILE BACKGROUND HELPER
 // ===========================
+function clearProfileBackgroundClasses() {
+  document.body.classList.remove(
+    "profile-bg-animated",
+    "profile-theme-galaxy",
+    "profile-theme-forest",
+    "profile-theme-sunset",
+    "profile-theme-neon",
+    "profile-theme-witchy",
+    "profile-theme-cyber",
+    "profile-pattern-stars",
+    "profile-pattern-grid",
+    "profile-pattern-weave"
+  );
+}
+
+function applyProfileBackground(user) {
+  // Reset any old styles
+  clearProfileBackgroundClasses();
+  document.body.style.background = "";
+  document.body.style.backgroundImage = "";
+  document.body.style.backgroundSize = "";
+  document.body.style.backgroundAttachment = "";
+  document.body.style.backgroundRepeat = "";
+
+  if (!user) return;
+
+  const mode = user.profileBgMode || "solid";
+
+  // 1) Solid color
+  if (mode === "solid") {
+    if (user.profileBgColor) {
+      document.body.style.background = user.profileBgColor;
+    }
+    return;
+  }
+
+  // 2) Preset themes (CSS classes)
+  if (mode === "preset") {
+    const preset = user.profileBgPreset || "";
+    if (!preset) return;
+
+    switch (preset) {
+      case "galaxy":
+        document.body.classList.add("profile-theme-galaxy", "profile-bg-animated");
+        break;
+      case "forest":
+        document.body.classList.add("profile-theme-forest");
+        break;
+      case "sunset":
+        document.body.classList.add("profile-theme-sunset", "profile-bg-animated");
+        break;
+      case "neon":
+        document.body.classList.add("profile-theme-neon", "profile-bg-animated");
+        break;
+      case "witchy":
+        document.body.classList.add("profile-theme-witchy");
+        break;
+      case "cyber":
+        document.body.classList.add("profile-theme-cyber", "profile-bg-animated");
+        break;
+    }
+    return;
+  }
+
+  // 3) Animated gradients (inline)
+  if (mode === "gradient") {
+    const g = user.profileBgGradient || "aurora";
+    document.body.classList.add("profile-bg-animated");
+    if (g === "sunrise") {
+      document.body.style.backgroundImage =
+        "linear-gradient(120deg, #ff9a9e, #fecfef, #f6d365, #fda085)";
+    } else if (g === "ocean") {
+      document.body.style.backgroundImage =
+        "linear-gradient(130deg, #0f172a, #1e293b, #0369a1, #22d3ee)";
+    } else {
+      // aurora default
+      document.body.style.backgroundImage =
+        "linear-gradient(135deg, #0f172a, #1e293b, #4c1d95, #9333ea, #22d3ee)";
+    }
+    return;
+  }
+
+  // 4) Patterns (CSS classes)
+  if (mode === "pattern") {
+    const pattern = user.profileBgPattern || "";
+    switch (pattern) {
+      case "stars":
+        document.body.classList.add("profile-pattern-stars");
+        break;
+      case "grid":
+        document.body.classList.add("profile-pattern-grid");
+        break;
+      case "weave":
+        document.body.classList.add("profile-pattern-weave");
+        break;
+    }
+    return;
+  }
+
+  // 5) Image background
+  if (mode === "image") {
+    if (user.profileBgImageDataUrl) {
+      document.body.style.backgroundImage = `url(${user.profileBgImageDataUrl})`;
+      document.body.style.backgroundSize = "cover";
+      document.body.style.backgroundAttachment = "fixed";
+      document.body.style.backgroundRepeat = "no-repeat";
+    }
+    return;
+  }
+}
+
 // ===========================
 //  RENDER PROFILE HEADER
 // ===========================
 function renderProfileHeader(profileUser, isOwnProfile) {
   const headerEl = document.getElementById("profileHeader");
   if (!headerEl || !profileUser) return;
+
+    // Apply full-page background based on user theme
+  applyProfileBackground(profileUser);
 
   // Apply background color to whole page body instead of header
   const bgColor = profileUser.profileBgColor || "";
@@ -1257,19 +1371,20 @@ function attachProfileComposerHandlers(profileUser) {
   });
 }
 
+let pendingAvatarDataUrl = null;
+let pendingBgImageDataUrl = null;
+
 // ===========================
 //  EDIT PROFILE FORM HANDLER
 // ===========================
-let pendingAvatarDataUrl = null;
-
 function setupEditProfileForm(user, isOwnProfile) {
   const card = document.getElementById("profileEditCard");
   const form = document.getElementById("editProfileForm");
   if (!card || !form) return;
 
-  // Only the owner should see/edit this
   if (!isOwnProfile) {
     card.hidden = true;
+    card.style.display = "none";
     return;
   }
 
@@ -1279,33 +1394,42 @@ function setupEditProfileForm(user, isOwnProfile) {
   const locationInput = document.getElementById("editLocation");
   const websiteInput = document.getElementById("editWebsite");
   const bioInput = document.getElementById("editBio");
-  const bgColorInput = document.getElementById("editBgColor");
   const avatarInput = document.getElementById("editAvatarInput");
 
-  // Pre-fill values
+  const bgModeInput = document.getElementById("editBgMode");
+  const bgColorInput = document.getElementById("editBgColor");
+  const bgPresetInput = document.getElementById("editBgPreset");
+  const bgGradientInput = document.getElementById("editBgGradient");
+  const bgPatternInput = document.getElementById("editBgPattern");
+  const bgImageInput = document.getElementById("editBgImage");
+
+  // Prefill
   if (nameInput) nameInput.value = user.name || "";
   if (usernameInput) usernameInput.value = user.username || "";
   if (locationInput) locationInput.value = user.location || "";
   if (websiteInput) websiteInput.value = user.website || "";
   if (bioInput) bioInput.value = user.bio || "";
-  if (bgColorInput) bgColorInput.value = user.profileBgColor || "";
 
-  // Track avatar changes
-  let pendingAvatarDataUrl = user.avatarDataUrl || user.avatar || null;
+  if (bgModeInput) bgModeInput.value = user.profileBgMode || "solid";
+  if (bgColorInput) bgColorInput.value = user.profileBgColor || "#101827";
+  if (bgPresetInput) bgPresetInput.value = user.profileBgPreset || "";
+  if (bgGradientInput) bgGradientInput.value = user.profileBgGradient || "";
+  if (bgPatternInput) bgPatternInput.value = user.profileBgPattern || "";
 
+  pendingAvatarDataUrl = user.avatarDataUrl || user.avatar || null;
+  pendingBgImageDataUrl = user.profileBgImageDataUrl || null;
+
+  // Avatar change
   if (avatarInput) {
     avatarInput.onchange = async () => {
       const file = avatarInput.files && avatarInput.files[0];
       if (!file) {
-        // Reset to current avatar if they cancel
         pendingAvatarDataUrl = user.avatarDataUrl || user.avatar || null;
         return;
       }
-
       try {
-        // Use existing resize helper
-        const resizedDataUrl = await resizeImageTo300px(file);
-        pendingAvatarDataUrl = resizedDataUrl;
+        const resized = await resizeImageTo300px(file);
+        pendingAvatarDataUrl = resized;
         showToastSuccess("New profile picture ready — don’t forget to save.");
       } catch (err) {
         console.error("Error processing avatar image:", err);
@@ -1315,8 +1439,28 @@ function setupEditProfileForm(user, isOwnProfile) {
     };
   }
 
-  // Avoid stacking multiple submit handlers
-  form.onsubmit = async function (e) {
+  // Background image change
+  if (bgImageInput) {
+    bgImageInput.onchange = async () => {
+      const file = bgImageInput.files && bgImageInput.files[0];
+      if (!file) {
+        pendingBgImageDataUrl = user.profileBgImageDataUrl || null;
+        return;
+      }
+      try {
+        // You can resize or keep full; we’ll resize a bit for sanity
+        const resized = await resizeImageTo300px(file);
+        pendingBgImageDataUrl = resized;
+        showToastSuccess("Background image loaded — save to apply.");
+      } catch (err) {
+        console.error("Error processing background image:", err);
+        pendingBgImageDataUrl = user.profileBgImageDataUrl || null;
+        showToastError("Couldn’t process that image. Try a smaller file.");
+      }
+    };
+  }
+
+  form.onsubmit = async (e) => {
     e.preventDefault();
 
     try {
@@ -1327,42 +1471,40 @@ function setupEditProfileForm(user, isOwnProfile) {
         return;
       }
 
-      // Start from existing user record
       const updatedUser = { ...users[idx] };
 
       if (nameInput) {
         const val = nameInput.value.trim();
         if (val) updatedUser.name = val;
       }
-
       if (usernameInput) {
         const val = usernameInput.value.trim();
         if (val) updatedUser.username = val;
       }
-
       if (locationInput) {
         updatedUser.location = locationInput.value.trim();
       }
-
       if (websiteInput) {
         updatedUser.website = websiteInput.value.trim();
       }
-
       if (bioInput) {
         updatedUser.bio = bioInput.value.trim();
       }
 
-      // 🔹 NEW: background color
-      if (bgColorInput) {
-        updatedUser.profileBgColor = bgColorInput.value || "";
-      }
+      // BACKGROUND SETTINGS
+      updatedUser.profileBgMode = bgModeInput ? bgModeInput.value : "solid";
+      updatedUser.profileBgColor = bgColorInput ? bgColorInput.value : "#101827";
+      updatedUser.profileBgPreset = bgPresetInput ? bgPresetInput.value : "";
+      updatedUser.profileBgGradient = bgGradientInput ? bgGradientInput.value : "";
+      updatedUser.profileBgPattern = bgPatternInput ? bgPatternInput.value : "";
+      updatedUser.profileBgImageDataUrl = pendingBgImageDataUrl || null;
 
       // Avatar
       if (pendingAvatarDataUrl) {
         updatedUser.avatarDataUrl = pendingAvatarDataUrl;
       }
 
-      // 🔹 Update Firestore user doc by user.id (backwards compatibility)
+      // Firestore write (backwards-compatible)
       await updateDoc(doc(usersCol, String(updatedUser.id)), {
         name: updatedUser.name,
         username: updatedUser.username,
@@ -1370,17 +1512,20 @@ function setupEditProfileForm(user, isOwnProfile) {
         website: updatedUser.website || "",
         bio: updatedUser.bio || "",
         avatarDataUrl: updatedUser.avatarDataUrl || null,
+        profileBgMode: updatedUser.profileBgMode || "solid",
         profileBgColor: updatedUser.profileBgColor || "",
+        profileBgPreset: updatedUser.profileBgPreset || "",
+        profileBgGradient: updatedUser.profileBgGradient || "",
+        profileBgPattern: updatedUser.profileBgPattern || "",
+        profileBgImageDataUrl: updatedUser.profileBgImageDataUrl || null,
       }).catch(async (err) => {
         console.warn("updateDoc failed, trying setDoc", err);
         await setDoc(doc(usersCol, String(updatedUser.id)), updatedUser);
       });
 
-      // Save locally
       users[idx] = updatedUser;
       saveUsers(users);
 
-      // 🔹 Always use the authenticated user's id as the canonical Firestore doc id
       const current = getCurrentUser();
       if (!current) {
         showToastError("You must be logged in to update your profile.");
@@ -1390,50 +1535,47 @@ function setupEditProfileForm(user, isOwnProfile) {
       const docId = String(current.id);
 
       const firestoreUserData = {
-        // IDs needed for security rules
         id: docId,
         userId: docId,
-
-        // Profile fields
         name: updatedUser.name,
         username: updatedUser.username,
         location: updatedUser.location || "",
         website: updatedUser.website || "",
         bio: updatedUser.bio || "",
         avatarDataUrl: updatedUser.avatarDataUrl || null,
+        profileBgMode: updatedUser.profileBgMode || "solid",
         profileBgColor: updatedUser.profileBgColor || "",
+        profileBgPreset: updatedUser.profileBgPreset || "",
+        profileBgGradient: updatedUser.profileBgGradient || "",
+        profileBgPattern: updatedUser.profileBgPattern || "",
+        profileBgImageDataUrl: updatedUser.profileBgImageDataUrl || null,
       };
 
       try {
-        // Try updating existing doc
         await updateDoc(doc(usersCol, docId), firestoreUserData);
       } catch (err) {
         console.warn("updateDoc failed, trying setDoc", err);
-        // If it doesn't exist yet, create it.
         await setDoc(doc(usersCol, docId), firestoreUserData);
       }
 
-      // Update posts with new name/username
-      const posts = loadPosts();
-      let changed = false;
-      posts.forEach((p) => {
-        if (String(p.userId) === String(updatedUser.id)) {
-          p.name = updatedUser.name;
-          p.username = updatedUser.username;
-          changed = true;
-        }
-      });
-      if (changed) {
-        savePosts(posts);
-      }
-
-      // Re-render profile so changes show immediately
+      // Re-render
       renderProfileHeader(updatedUser, true);
       renderProfileAbout(updatedUser);
       renderProfileTopics(updatedUser);
       renderProfilePosts(updatedUser, true);
 
       showToastSuccess("Profile updated successfully!");
+
+      // Optional: close editor after save
+      const editCard = document.getElementById("profileEditCard");
+      const editBtn = document.getElementById("editProfileBtn");
+      if (editCard) {
+        editCard.style.display = "none";
+        editCard.setAttribute("hidden", "true");
+      }
+      if (editBtn) {
+        editBtn.textContent = "Edit profile";
+      }
     } catch (err) {
       console.error(err);
       showToastError("Something went wrong. Please try again.");
