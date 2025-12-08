@@ -716,33 +716,65 @@ function renderPopularTopics() {
   const container = document.getElementById("popularTopics");
   if (!container) return;
 
-  const stats = computeTopicStats();
-  container.innerHTML = "";
-
-  if (!stats.length) {
-    const empty = document.createElement("small");
-    empty.className = "text-body-secondary";
-    empty.textContent =
-      "No hashtags yet. Add #tags in your posts to see topics here.";
-    container.appendChild(empty);
+  const posts = loadPosts();
+  if (!posts.length) {
+    container.innerHTML =
+      '<small class="text-body-secondary">No topics yet.</small>';
     return;
   }
 
-  const topTopics = stats.slice(0, 6);
+  // Build hashtag stats
+  const tagStats = {};
 
-  topTopics.forEach((s) => {
-    const span = document.createElement("span");
-    span.className = "tag-pill";
-    span.dataset.topic = s.topic;
+  posts.forEach((post) => {
+    const tags = post.tags || [];
+    const likes = post.likes || 0;
 
-    const likes = s.totalLikes || 0;
-    span.textContent = `#${s.topic} · ${likes}♥`;
+    tags.forEach((tag) => {
+      if (!tagStats[tag]) {
+        tagStats[tag] = {
+          tag,
+          postCount: 0,
+          totalLikes: 0,
+        };
+      }
+      tagStats[tag].postCount++;
+      tagStats[tag].totalLikes += likes;
+    });
+  });
 
-    span.title = `${likes} like${likes === 1 ? "" : "s"} across ${
-      s.postCount
-    } post${s.postCount === 1 ? "" : "s"}`;
+  let topics = Object.values(tagStats);
 
-    container.appendChild(span);
+  // Score topics (likes + post count + slight randomization)
+  topics = topics
+    .map((t) => {
+      const popularityScore =
+        t.totalLikes * 2 + t.postCount * 3;
+      const randomJitter = Math.random() * 5;
+
+      const score = popularityScore + randomJitter;
+
+      return { ...t, score };
+    })
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 10);
+
+  container.innerHTML = "";
+
+  topics.forEach((t) => {
+    const el = document.createElement("button");
+    el.className = "btn btn-soft me-1 mb-1 topic-pill";
+    el.dataset.topic = t.tag;
+
+    // 🎯 DISPLAY HEARTS + LIKES + POSTS
+    el.innerHTML = `
+      #${t.tag}
+      <span class="text-body-secondary small">
+        · ${t.totalLikes}♥
+      </span>
+    `;
+
+    container.appendChild(el);
   });
 }
 
@@ -795,15 +827,27 @@ function renderPeopleToFollow() {
   if (!container) return;
 
   const currentUser = getCurrentUser();
-  const stats = computeUserLikeStats();
+  const stats = computeUserLikeStats(); // base stats: totalLikes, postCount, user info
 
   container.innerHTML = "";
 
-  const filtered = currentUser
-    ? stats.filter((s) => s.userId !== currentUser.id)
-    : stats;
+  // 🔹 Build candidate list
+  let candidates = stats;
+  let followingSet = new Set();
+  const followsMap = loadFollows();
 
-  if (!filtered.length) {
+  if (currentUser) {
+    const followingIds = getFollowingIds(currentUser.id).map(String);
+    followingSet = new Set(followingIds);
+
+    // Exclude yourself and people you already follow
+    candidates = stats.filter((s) => {
+      const idStr = String(s.userId);
+      return idStr !== String(currentUser.id) && !followingSet.has(idStr);
+    });
+  }
+
+  if (!candidates.length) {
     const empty = document.createElement("small");
     empty.className = "text-body-secondary";
     empty.textContent =
@@ -812,7 +856,37 @@ function renderPeopleToFollow() {
     return;
   }
 
-  const topUsers = filtered.slice(0, 3);
+  // 🔹 Score candidates
+  const scored = candidates.map((u) => {
+    // Base popularity score: likes + posts (weighted)
+    const popularityScore = (u.totalLikes || 0) * 1 + (u.postCount || 0) * 2;
+
+    // Friend-of-friend score:
+    // count how many people *you* follow also follow this user
+    let mutualCount = 0;
+    if (currentUser && followingSet.size > 0) {
+      for (const fid of followingSet) {
+        const list = followsMap[fid];
+        if (Array.isArray(list) && list.includes(String(u.userId))) {
+          mutualCount++;
+        }
+      }
+    }
+
+    const friendBoost = mutualCount * 20; // strong boost for being followed by your follows
+    const randomJitter = Math.random() * 5; // small random change so list shuffles each load
+
+    const score = popularityScore + friendBoost + randomJitter;
+
+    return {
+      ...u,
+      score,
+      mutualCount,
+    };
+  });
+
+  // 🔹 Sort by score (desc) and take top few
+  const topUsers = scored.sort((a, b) => b.score - a.score).slice(0, 5);
 
   topUsers.forEach((u) => {
     const row = document.createElement("div");
@@ -852,6 +926,11 @@ function renderPeopleToFollow() {
       ? "btn btn-main btn-sm px-2 py-1"
       : "btn btn-outline-soft btn-sm px-2 py-1";
 
+    const metaLine =
+      u.mutualCount && u.mutualCount > 0
+        ? `@${u.username} · ${u.totalLikes}♥ · Followed by ${u.mutualCount} you follow`
+        : `@${u.username} · ${u.totalLikes}♥`;
+
     row.innerHTML = `
       <a
         href="profile.html?userId=${u.userId}"
@@ -863,7 +942,7 @@ function renderPeopleToFollow() {
             ${escapeHtml(u.name)}
           </div>
           <div class="text-body-secondary" style="font-size: 0.78rem;">
-            @${escapeHtml(u.username)} · ${u.totalLikes}♥
+            ${escapeHtml(metaLine)}
           </div>
         </div>
       </a>
@@ -900,14 +979,15 @@ function renderActiveTopicBar() {
 // ===========================
 //  RENDER POSTS ON MAIN WALL
 // ===========================
+// ===========================
+//  RENDER POSTS ON MAIN WALL
+// ===========================
 function renderPosts() {
   const container = document.getElementById("postList");
   if (!container) return;
 
-  // Load posts & sort newest first
-  const allPosts = loadPosts()
-    .slice()
-    .sort((a, b) => b.createdAt - a.createdAt);
+  // Load posts (we'll handle sorting after filters)
+  const allPosts = loadPosts().slice();
 
   // Start with all posts
   let posts = allPosts;
@@ -952,6 +1032,30 @@ function renderPosts() {
     });
   }
 
+  // ⭐ NEW: recency-biased random sort
+  // - Newer posts get a higher base score
+  // - Random jitter ensures order changes on each render
+  const now = Date.now();
+  posts = posts
+    .map((p) => {
+      const created = p.createdAt || 0;
+
+      // Age in hours (fallback to "very old" if missing)
+      const ageHours = created ? (now - created) / (1000 * 60 * 60) : 9999;
+
+      // Recency bias: decays as the post gets older
+      // Within ~24 hours -> strong weight; older -> weaker
+      const recencyBias = Math.exp(-ageHours / 24); // 1 for fresh, close to 0 when old
+
+      const randomJitter = Math.random(); // 0–1
+      // Weight recency more than randomness so newer posts are still favored
+      const score = recencyBias * 2 + randomJitter;
+
+      return { post: p, score };
+    })
+    .sort((a, b) => b.score - a.score)
+    .map((entry) => entry.post);
+
   // Now we’re ready to render
   container.innerHTML = "";
 
@@ -972,13 +1076,6 @@ function renderPosts() {
     container.appendChild(empty);
     return;
   }
-
-  // 👇 keep your existing rendering loop here (posts.forEach(...))
-  posts.forEach((post) => {
-    // ... your existing card creation / comment / like rendering ...
-  });
-
-  container.innerHTML = "";
 
   const users = loadUsers();
 
@@ -1020,22 +1117,21 @@ function renderPosts() {
     const commentCount = commentsForPost.length;
     const userLiked =
       currentUser && hasUserLikedPost(currentUser.id, post.id);
-
     const canDelete = currentUser && currentUser.id === post.userId;
 
     const { bodyHtml, embedHtml } = parsePostBodyWithLinks(post.body || "");
 
-const postImageHtml = post.imageDataUrl
-  ? `
-    <div class="post-image mt-2">
-      <img
-        src="${escapeHtml(post.imageDataUrl)}"
-        alt="Post image"
-        class="post-image-img"
-      />
-    </div>
-  `
-  : "";
+    const postImageHtml = post.imageDataUrl
+      ? `
+        <div class="post-image mt-2">
+          <img
+            src="${escapeHtml(post.imageDataUrl)}"
+            alt="Post image"
+            class="post-image-img"
+          />
+        </div>
+      `
+      : "";
 
     const article = document.createElement("article");
     article.className = "post-card mb-2";
@@ -1076,10 +1172,10 @@ const postImageHtml = post.imageDataUrl
           </div>
 
           <div class="post-body">
-          ${bodyHtml}
-        </div>
-        ${embedHtml}
-        ${postImageHtml}
+            ${bodyHtml}
+          </div>
+          ${embedHtml}
+          ${postImageHtml}
 
           <div class="post-actions mt-1">
             <button
