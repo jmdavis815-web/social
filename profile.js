@@ -2,18 +2,20 @@
 //  FIREBASE APP + FIRESTORE
 // ===========================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+
 import {
   getFirestore,
   collection,
   doc,
   getDocs,
+  getDoc,
   setDoc,
   addDoc,
   updateDoc,
   deleteDoc,
   query,
   where,
-  orderBy,
+  orderBy
 } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 
 // 🔹 Same config as index.js
@@ -21,7 +23,7 @@ const firebaseConfig = {
   apiKey: "AIzaSyCx_ChAZXvx1CX-GBNbgiv1znL95z8JCJo",
   authDomain: "openwall-b9fc7.firebaseapp.com",
   projectId: "openwall-b9fc7",
-  storageBucket: "openwall-b9fc7.appspot.com",
+  storageBucket: "openwall-b9fc7.firebasestorage.app",
   messagingSenderId: "584620300362",
   appId: "1:584620300362:web:c313bcc2c982b638a16eb3",
 };
@@ -750,11 +752,14 @@ function applyProfileBackground(user) {
 // ===========================
 //  RENDER PROFILE HEADER
 // ===========================
+// ===========================
+//  RENDER PROFILE HEADER
+// ===========================
 function renderProfileHeader(profileUser, isOwnProfile) {
   const headerEl = document.getElementById("profileHeader");
   if (!headerEl || !profileUser) return;
 
-    // Apply full-page background based on user theme
+  // Apply full-page background based on user theme
   applyProfileBackground(profileUser);
 
   // Apply background color to whole page body instead of header
@@ -766,8 +771,8 @@ function renderProfileHeader(profileUser, isOwnProfile) {
   }
 
   // Stats
-  const postStats   = computeUserStats(profileUser.id);   // { postCount, totalLikes }
-  const followStats = computeFollowStats(profileUser.id); // { followerCount, followingCount }
+  const postStats = computeUserStats(profileUser.id);
+  const followStats = computeFollowStats(profileUser.id);
 
   const displayName   = profileUser.name || "Unknown user";
   const displayHandle = profileUser.username || "user";
@@ -788,7 +793,7 @@ function renderProfileHeader(profileUser, isOwnProfile) {
       </div>
     `;
 
-  // Determine edit/follow visibility
+  // Who is viewing?
   const currentUser = getCurrentUser();
   const loggedIn    = !!currentUser;
   const viewingOwn  = loggedIn && String(currentUser.id) === String(profileUser.id);
@@ -816,69 +821,163 @@ function renderProfileHeader(profileUser, isOwnProfile) {
         class="btn btn-outline-soft btn-sm"
         id="editProfileBtn"
       >
-        Edit
+        Edit profile
       </button>
     `
     : "";
 
-  // Render header normally (no background color here)
+  const youBadgeHtml = viewingOwn
+    ? '<span class="ms-1 badge bg-secondary-subtle text-body-secondary border">You</span>'
+    : "";
+
+  // Cover style (from Firestore/local stored data URL)
+  const coverStyle = profileUser.profileCoverPhoto
+    ? ` style="background-image: url('${escapeHtml(profileUser.profileCoverPhoto)}');"`
+    : "";
+
   headerEl.innerHTML = `
-    <div class="card-body d-flex justify-content-between align-items-center gap-3">
-      <div class="d-flex align-items-center gap-3">
-        <div class="post-avatar">
-          ${avatarHtml}
+    <div class="fb-profile-header">
+      <!-- Cover area -->
+      <div class="fb-profile-cover"${coverStyle}></div>
+
+      ${viewingOwn ? `
+        <div class="fb-cover-edit">
+          <input type="file" id="coverPhotoInput" accept="image/*" hidden>
+          <button type="button" class="btn btn-outline-soft btn-sm" id="changeCoverPhotoBtn">
+            Change cover photo
+          </button>
         </div>
-        <div>
-          <h1 class="h5 mb-1">${escapeHtml(displayName)}</h1>
-          <div class="text-body-secondary small mb-1">
-            @${escapeHtml(displayHandle)}
-            ${
-              viewingOwn
-                ? '<span class="ms-1 badge bg-secondary-subtle text-body-secondary border">You</span>'
-                : ""
-            }
+      ` : ""}
+
+      <!-- Avatar + name + stats + buttons -->
+      <div class="fb-profile-bar">
+        <div class="d-flex align-items-end gap-3">
+          <div class="profile-avatar-wrapper fb-profile-avatar">
+            ${avatarHtml}
           </div>
-          <div class="small text-body-secondary">
-            <span>${postStats.postCount} post${
-              postStats.postCount === 1 ? "" : "s"
-            }</span>
+          <div class="fb-profile-text">
+            <h1 class="fb-profile-name mb-0">
+              ${escapeHtml(displayName)}
+            </h1>
+            <div class="fb-profile-username text-body-secondary small">
+              @${escapeHtml(displayHandle)}
+              ${youBadgeHtml}
+            </div>
+            <div class="fb-profile-stats">
+              <span>${postStats.postCount} post${postStats.postCount === 1 ? "" : "s"}</span>
+              <span class="ms-2">${postStats.totalLikes} like${postStats.totalLikes === 1 ? "" : "s"}</span>
+              <span class="ms-2">${followStats.followerCount} follower${followStats.followerCount === 1 ? "" : "s"}</span>
 
-            <span class="ms-2">${postStats.totalLikes} like${
-              postStats.totalLikes === 1 ? "" : "s"
-            }</span>
-
-            <span class="ms-2">${followStats.followerCount} follower${
-              followStats.followerCount === 1 ? "" : "s"
-            }</span>
-
-            <!-- Following count: clickable -->
-            <button
-              type="button"
-              class="btn btn-link p-0 ms-2 align-baseline following-trigger"
-              id="profileFollowingTrigger"
-              data-user-id="${profileUser.id}"
-            >
-              ${followStats.followingCount} following
-            </button>
+              <button
+                type="button"
+                class="btn btn-link p-0 ms-2 align-baseline following-trigger"
+                id="profileFollowingTrigger"
+                data-user-id="${profileUser.id}"
+              >
+                ${followStats.followingCount} following
+              </button>
+            </div>
           </div>
+        </div>
+
+        <div class="d-flex align-items-center gap-2">
+          ${viewingOwn ? editBtnHtml : followBtnHtml}
         </div>
       </div>
-
-      ${viewingOwn ? editBtnHtml : followBtnHtml}
     </div>
   `;
 
-  // Wire up edit button if this is your own profile
-  if (isOwnProfile) {
+  // ✅ Make "Edit profile" show/hide the edit card
+  if (viewingOwn) {
     const editBtn = document.getElementById("editProfileBtn");
     const editCard = document.getElementById("profileEditCard");
+
     if (editBtn && editCard) {
-      editBtn.onclick = () => {
-        const hidden = editCard.hasAttribute("hidden");
-        if (hidden) {
+      editBtn.addEventListener("click", () => {
+        const isHidden =
+          editCard.hasAttribute("hidden") ||
+          editCard.style.display === "none";
+
+        if (isHidden) {
           editCard.removeAttribute("hidden");
+          editCard.style.display = "";
         } else {
           editCard.setAttribute("hidden", "true");
+          editCard.style.display = "none";
+        }
+      });
+    }
+  }
+
+  // ✅ Wire up "Change cover photo" for your own profile
+  if (viewingOwn) {
+    const changeBtn = document.getElementById("changeCoverPhotoBtn");
+    const fileInput = document.getElementById("coverPhotoInput");
+
+    if (changeBtn && fileInput) {
+      changeBtn.onclick = () => fileInput.click();
+
+      fileInput.onchange = async (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+
+        try {
+          const dataUrl = await resizeImageTo300px(file);
+
+          // Update local current user
+          const current = getCurrentUser();
+          if (current && String(current.id) === String(profileUser.id)) {
+            current.profileCoverPhoto = dataUrl;
+            setCurrentUser(current);
+          }
+
+          // Update local users array
+          try {
+            const users = loadUsers();
+            const idx = users.findIndex(
+              (u) => String(u.id) === String(profileUser.id)
+            );
+            if (idx !== -1) {
+              users[idx].profileCoverPhoto = dataUrl;
+              saveUsers(users);
+            }
+          } catch (err) {
+            if (err && err.name === "QuotaExceededError") {
+              console.warn(
+                "LocalStorage quota exceeded while saving cover photo. " +
+                  "Cover will still be saved to Firestore."
+              );
+              if (typeof showToastError === "function") {
+                showToastError(
+                  "Your cover photo is saved online, but storage is full on this device."
+                );
+              }
+            } else {
+              console.error("Error saving users with cover photo:", err);
+            }
+          }
+
+          // Update Firestore (best effort)
+          try {
+            await updateDoc(doc(usersCol, String(profileUser.id)), {
+              profileCoverPhoto: dataUrl,
+            });
+          } catch (err) {
+            console.error("Error saving cover photo to Firestore:", err);
+          }
+
+          // Re-render header with new cover
+          renderProfileHeader(
+            { ...profileUser, profileCoverPhoto: dataUrl },
+            true
+          );
+        } catch (err) {
+          console.error("Error processing cover image:", err);
+          if (typeof showToastError === "function") {
+            showToastError("Could not process that image. Try a smaller file.");
+          } else {
+            alert("Could not process that image. Try a smaller file.");
+          }
         }
       };
     }
@@ -1732,7 +1831,7 @@ function renderProfile() {
   }
 
   const currentUser = getCurrentUser();
-  const isOwnProfile = currentUser && currentUser.id === profileUser.id;
+  const isOwnProfile = currentUser && String(currentUser.id) === String(profileUser.id);
 
   renderProfileHeader(profileUser, isOwnProfile);
   renderProfileAbout(profileUser);
