@@ -563,66 +563,101 @@ function computeUserTopics(userId) {
 // ===========================
 //  RENDER PROFILE HEADER
 // ===========================
-function renderProfileHeader(user, isOwnProfile) {
+// ===========================
+//  RENDER PROFILE HEADER
+// ===========================
+function renderProfileHeader(profileUser, isOwnProfile) {
   const headerEl = document.getElementById("profileHeader");
-  if (!headerEl) return;
+  if (!headerEl || !profileUser) return;
 
-  const stats = computeUserStats(user.id);
-  const followStats = computeFollowStats(user.id);
-  const avatarUrl = getAvatarUrlForUser(user);
-  const initials = getInitials(user.name);
-
-  let avatarInner = "";
-  if (avatarUrl) {
-    avatarInner = `<img src="${avatarUrl}" alt="${escapeHtml(
-      user.name || "Avatar"
-    )}" style="width:100%;height:100%;object-fit:cover;" />`;
+  // Apply background color to whole page body instead of header
+  const bgColor = profileUser.profileBgColor || "";
+  if (bgColor) {
+    document.body.style.backgroundColor = bgColor;
   } else {
-    avatarInner = escapeHtml(initials);
+    document.body.style.backgroundColor = ""; // default theme handles it
   }
 
+  // Stats
+  const postStats   = computeUserStats(profileUser.id);   // { postCount, totalLikes }
+  const followStats = computeFollowStats(profileUser.id); // { followerCount, followingCount }
+
+  const displayName   = profileUser.name || "Unknown user";
+  const displayHandle = profileUser.username || "user";
+  const avatarUrl     = getAvatarUrlForUser(profileUser);
+  const initials      = getInitials(displayName);
+
+  const avatarHtml = avatarUrl
+    ? `
+      <img
+        src="${escapeHtml(avatarUrl)}"
+        alt="${escapeHtml(displayName)}"
+        class="profile-avatar-img"
+      />
+    `
+    : `
+      <div class="profile-avatar-fallback">
+        ${escapeHtml(initials)}
+      </div>
+    `;
+
+  // Determine edit/follow visibility
   const currentUser = getCurrentUser();
-  const viewingUserId = currentUser ? currentUser.id : null;
-  const showFollowButton = !isOwnProfile && !!viewingUserId;
+  const loggedIn    = !!currentUser;
+  const viewingOwn  = loggedIn && String(currentUser.id) === String(profileUser.id);
 
-  const isUserFollowing =
-    showFollowButton && isFollowing(viewingUserId, user.id);
+  const showFollow = loggedIn && !viewingOwn;
+  const isFollowingUser =
+    showFollow && isFollowing(currentUser.id, profileUser.id);
 
-  const followBtnHtml = showFollowButton
+  const followBtnHtml = showFollow
     ? `
       <button
         type="button"
-        class="btn ${isUserFollowing ? "btn-main" : "btn-outline-soft"} btn-sm"
-        data-follow-target-id="${user.id}"
+        class="btn ${isFollowingUser ? "btn-main" : "btn-outline-soft"} btn-sm"
+        data-follow-target-id="${profileUser.id}"
       >
-        ${isUserFollowing ? "Following" : "Follow"}
+        ${isFollowingUser ? "Following" : "Follow"}
       </button>
     `
     : "";
 
+  const editBtnHtml = viewingOwn
+    ? `
+      <button
+        type="button"
+        class="btn btn-outline-soft btn-sm"
+        id="editProfileBtn"
+      >
+        Edit
+      </button>
+    `
+    : "";
+
+  // Render header normally (no background color here)
   headerEl.innerHTML = `
     <div class="card-body d-flex justify-content-between align-items-center gap-3">
       <div class="d-flex align-items-center gap-3">
         <div class="post-avatar">
-          ${avatarInner}
+          ${avatarHtml}
         </div>
         <div>
-          <h1 class="h5 mb-1">${escapeHtml(user.name || "Unnamed user")}</h1>
+          <h1 class="h5 mb-1">${escapeHtml(displayName)}</h1>
           <div class="text-body-secondary small mb-1">
-            @${escapeHtml(user.username || "user")}
+            @${escapeHtml(displayHandle)}
             ${
-              isOwnProfile
+              viewingOwn
                 ? '<span class="ms-1 badge bg-secondary-subtle text-body-secondary border">You</span>'
                 : ""
             }
           </div>
-                    <div class="small text-body-secondary">
-            <span>${stats.postCount} post${
-              stats.postCount === 1 ? "" : "s"
+          <div class="small text-body-secondary">
+            <span>${postStats.postCount} post${
+              postStats.postCount === 1 ? "" : "s"
             }</span>
 
-            <span class="ms-2">${stats.totalLikes} like${
-              stats.totalLikes === 1 ? "" : "s"
+            <span class="ms-2">${postStats.totalLikes} like${
+              postStats.totalLikes === 1 ? "" : "s"
             }</span>
 
             <span class="ms-2">${followStats.followerCount} follower${
@@ -634,20 +669,33 @@ function renderProfileHeader(user, isOwnProfile) {
               type="button"
               class="btn btn-link p-0 ms-2 align-baseline following-trigger"
               id="profileFollowingTrigger"
-              data-user-id="${user.id}"
+              data-user-id="${profileUser.id}"
             >
               ${followStats.followingCount} following
             </button>
           </div>
         </div>
       </div>
-      ${isOwnProfile
-  ? `<button id="editProfileBtn" class="btn btn-outline-soft btn-sm">Edit</button>`
-  : followBtnHtml
-}
 
+      ${viewingOwn ? editBtnHtml : followBtnHtml}
     </div>
   `;
+
+  // Wire up edit button if this is your own profile
+  if (isOwnProfile) {
+    const editBtn = document.getElementById("editProfileBtn");
+    const editCard = document.getElementById("profileEditCard");
+    if (editBtn && editCard) {
+      editBtn.onclick = () => {
+        const hidden = editCard.hasAttribute("hidden");
+        if (hidden) {
+          editCard.removeAttribute("hidden");
+        } else {
+          editCard.setAttribute("hidden", "true");
+        }
+      };
+    }
+  }
 }
 
 // ===========================
@@ -1215,43 +1263,38 @@ function attachProfileComposerHandlers(profileUser) {
 let pendingAvatarDataUrl = null;
 
 function setupEditProfileForm(user, isOwnProfile) {
-  const form = document.getElementById("editProfileForm");
   const card = document.getElementById("profileEditCard");
+  const form = document.getElementById("editProfileForm");
+  if (!card || !form) return;
 
-  if (!form || !card) return;
-
-  // Only show edit section for your own profile
+  // Only the owner should see/edit this
   if (!isOwnProfile) {
-    card.style.display = "none";
-    card.setAttribute("hidden", "true");
+    card.hidden = true;
     return;
-  } else {
-    // keep it hidden by default; Edit button will reveal it
-    card.style.display = "none";
-    card.setAttribute("hidden", "true");
   }
 
+  // Inputs
   const nameInput = document.getElementById("editName");
   const usernameInput = document.getElementById("editUsername");
   const locationInput = document.getElementById("editLocation");
   const websiteInput = document.getElementById("editWebsite");
   const bioInput = document.getElementById("editBio");
+  const bgColorInput = document.getElementById("editBgColor");
   const avatarInput = document.getElementById("editAvatarInput");
 
-  // Prefill fields
+  // Pre-fill values
   if (nameInput) nameInput.value = user.name || "";
   if (usernameInput) usernameInput.value = user.username || "";
   if (locationInput) locationInput.value = user.location || "";
   if (websiteInput) websiteInput.value = user.website || "";
   if (bioInput) bioInput.value = user.bio || "";
+  if (bgColorInput) bgColorInput.value = user.profileBgColor || "";
 
-  // Start with whatever avatar the user already has
-  pendingAvatarDataUrl = user.avatarDataUrl || user.avatar || null;
+  // Track avatar changes
+  let pendingAvatarDataUrl = user.avatarDataUrl || user.avatar || null;
 
-  // When user picks a new image file, RESIZE IT and store as data URL
   if (avatarInput) {
-    avatarInput.value = "";
-    avatarInput.addEventListener("change", async () => {
+    avatarInput.onchange = async () => {
       const file = avatarInput.files && avatarInput.files[0];
       if (!file) {
         // Reset to current avatar if they cancel
@@ -1260,7 +1303,7 @@ function setupEditProfileForm(user, isOwnProfile) {
       }
 
       try {
-        // 🔹 Use the helper you already defined
+        // Use existing resize helper
         const resizedDataUrl = await resizeImageTo300px(file);
         pendingAvatarDataUrl = resizedDataUrl;
         showToastSuccess("New profile picture ready — don’t forget to save.");
@@ -1269,38 +1312,57 @@ function setupEditProfileForm(user, isOwnProfile) {
         pendingAvatarDataUrl = user.avatarDataUrl || user.avatar || null;
         showToastError("Couldn’t process that image. Try a smaller file.");
       }
-    });
+    };
   }
 
+  // Avoid stacking multiple submit handlers
   form.onsubmit = async function (e) {
     e.preventDefault();
 
     try {
       const users = loadUsers();
-      const idx = users.findIndex((u) => u.id === user.id);
+      const idx = users.findIndex((u) => String(u.id) === String(user.id));
       if (idx === -1) {
         showToastError("Profile not found in storage.");
         return;
       }
 
-      // Start from the existing user record
+      // Start from existing user record
       const updatedUser = { ...users[idx] };
 
-      if (nameInput)
-        updatedUser.name = nameInput.value.trim() || updatedUser.name;
-      if (usernameInput)
-        updatedUser.username =
-          usernameInput.value.trim() || updatedUser.username;
-      if (locationInput) updatedUser.location = locationInput.value.trim();
-      if (websiteInput) updatedUser.website = websiteInput.value.trim();
-      if (bioInput) updatedUser.bio = bioInput.value.trim();
+      if (nameInput) {
+        const val = nameInput.value.trim();
+        if (val) updatedUser.name = val;
+      }
 
-      // 🔹 If we have an avatar data URL, store it
+      if (usernameInput) {
+        const val = usernameInput.value.trim();
+        if (val) updatedUser.username = val;
+      }
+
+      if (locationInput) {
+        updatedUser.location = locationInput.value.trim();
+      }
+
+      if (websiteInput) {
+        updatedUser.website = websiteInput.value.trim();
+      }
+
+      if (bioInput) {
+        updatedUser.bio = bioInput.value.trim();
+      }
+
+      // 🔹 NEW: background color
+      if (bgColorInput) {
+        updatedUser.profileBgColor = bgColorInput.value || "";
+      }
+
+      // Avatar
       if (pendingAvatarDataUrl) {
         updatedUser.avatarDataUrl = pendingAvatarDataUrl;
       }
 
-      // 🔹 Update Firestore user doc
+      // 🔹 Update Firestore user doc by user.id (backwards compatibility)
       await updateDoc(doc(usersCol, String(updatedUser.id)), {
         name: updatedUser.name,
         username: updatedUser.username,
@@ -1308,6 +1370,7 @@ function setupEditProfileForm(user, isOwnProfile) {
         website: updatedUser.website || "",
         bio: updatedUser.bio || "",
         avatarDataUrl: updatedUser.avatarDataUrl || null,
+        profileBgColor: updatedUser.profileBgColor || "",
       }).catch(async (err) => {
         console.warn("updateDoc failed, trying setDoc", err);
         await setDoc(doc(usersCol, String(updatedUser.id)), updatedUser);
@@ -1317,7 +1380,7 @@ function setupEditProfileForm(user, isOwnProfile) {
       users[idx] = updatedUser;
       saveUsers(users);
 
-            // 🔹 Always use the *authenticated* user's id as the Firestore doc id
+      // 🔹 Always use the authenticated user's id as the canonical Firestore doc id
       const current = getCurrentUser();
       if (!current) {
         showToastError("You must be logged in to update your profile.");
@@ -1338,6 +1401,7 @@ function setupEditProfileForm(user, isOwnProfile) {
         website: updatedUser.website || "",
         bio: updatedUser.bio || "",
         avatarDataUrl: updatedUser.avatarDataUrl || null,
+        profileBgColor: updatedUser.profileBgColor || "",
       };
 
       try {
@@ -1345,8 +1409,7 @@ function setupEditProfileForm(user, isOwnProfile) {
         await updateDoc(doc(usersCol, docId), firestoreUserData);
       } catch (err) {
         console.warn("updateDoc failed, trying setDoc", err);
-        // If it doesn't exist yet, create it. This must still satisfy your rules:
-        // request.auth.uid == userId (doc path) and == request.resource.data.userId
+        // If it doesn't exist yet, create it.
         await setDoc(doc(usersCol, docId), firestoreUserData);
       }
 
@@ -1354,7 +1417,7 @@ function setupEditProfileForm(user, isOwnProfile) {
       const posts = loadPosts();
       let changed = false;
       posts.forEach((p) => {
-        if (p.userId === updatedUser.id) {
+        if (String(p.userId) === String(updatedUser.id)) {
           p.name = updatedUser.name;
           p.username = updatedUser.username;
           changed = true;
@@ -1364,7 +1427,7 @@ function setupEditProfileForm(user, isOwnProfile) {
         savePosts(posts);
       }
 
-      // Re-render profile sections so the new avatar shows up immediately
+      // Re-render profile so changes show immediately
       renderProfileHeader(updatedUser, true);
       renderProfileAbout(updatedUser);
       renderProfileTopics(updatedUser);
@@ -1926,28 +1989,6 @@ document.addEventListener("click", (e) => {
 
   // Send back to home
   window.location.href = "index.html";
-});
-
-// ===========================
-//  EDIT PROFILE BUTTON HANDLER
-// ===========================
-document.addEventListener("click", function (e) {
-  const btn = e.target.closest("#editProfileBtn");
-  if (!btn) return;
-
-  const card = document.getElementById("profileEditCard");
-  if (!card) return;
-
-  const isHidden = card.style.display === "none" || card.hasAttribute("hidden");
-
-  if (isHidden) {
-    card.style.display = "";    // show
-    card.removeAttribute("hidden");
-    btn.textContent = "Close";
-  } else {
-    card.style.display = "none"; // hide
-    btn.textContent = "Edit";
-  }
 });
 
 // ===========================
