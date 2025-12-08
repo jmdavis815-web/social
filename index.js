@@ -43,6 +43,9 @@ const usersCol = collection(db, "users");
 const postsCol = collection(db, "posts");
 const followsCol = collection(db, "follows");   // followerId -> targetId
 const commentsCol = collection(db, "comments"); // comments for posts
+// 🔔 NEW — Notifications collection
+const notificationsCol = collection(db, "notifications");
+
 
 // ===========================
 //  LOCAL STORAGE KEYS
@@ -63,43 +66,18 @@ function loadLikes() {
 }
 
 // ===========================
-//  NOTIFICATIONS (LOCAL STORAGE)
+//  NOTIFICATIONS (FIRESTORE)
 // ===========================
-const NOTIFICATIONS_KEY = "openwall-notifications";
 
-function loadNotificationsMap() {
-  try {
-    const raw = localStorage.getItem(NOTIFICATIONS_KEY);
-    return raw ? JSON.parse(raw) : {};
-  } catch (err) {
-    console.error("Error loading notifications:", err);
-    return {};
-  }
-}
+// ===========================
+//  NOTIFICATIONS (FIRESTORE)
+// ===========================
 
-function saveNotificationsMap(map) {
-  try {
-    localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(map));
-  } catch (err) {
-    console.error("Error saving notifications:", err);
-  }
-}
-
-/**
- * Add a notification for a specific user.
- * `payload` can be any object describing the notification.
- */
-function addNotification(userId, payload) {
+async function addNotification(userId, payload) {
   if (!userId) return;
-  const map = loadNotificationsMap();
-  const key = String(userId);
-
-  if (!Array.isArray(map[key])) {
-    map[key] = [];
-  }
 
   const notification = {
-    id: Date.now(),
+    userId: String(userId),
     type: payload.type || "comment",
     postId: payload.postId || null,
     commenterId: payload.commenterId || null,
@@ -108,79 +86,75 @@ function addNotification(userId, payload) {
     timestamp: payload.timestamp || Date.now(),
   };
 
-  // newest first
-  map[key].unshift(notification);
-
-  saveNotificationsMap(map);
+  await addDoc(notificationsCol, notification);
 }
 
-/**
- * Get notifications for a given userId
- */
-function getNotificationsForUser(userId) {
+async function getNotificationsForUser(userId) {
   if (!userId) return [];
-  const map = loadNotificationsMap();
-  const key = String(userId);
-  return Array.isArray(map[key]) ? map[key] : [];
+
+  const q = query(
+    notificationsCol,
+    where("userId", "==", String(userId)),
+    orderBy("timestamp", "desc")
+  );
+
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => ({
+    id: d.id,
+    ...d.data(),
+  }));
 }
 
-/**
- * Clear notifications for a given userId
- */
-function clearNotificationsForUser(userId) {
+async function clearNotificationsForUser(userId) {
   if (!userId) return;
-  const map = loadNotificationsMap();
-  const key = String(userId);
-  map[key] = [];
-  saveNotificationsMap(map);
+
+  const q = query(notificationsCol, where("userId", "==", String(userId)));
+  const snap = await getDocs(q);
+
+  const deletions = snap.docs.map((d) =>
+    deleteDoc(doc(notificationsCol, d.id))
+  );
+
+  await Promise.all(deletions);
 }
 
-/**
- * Update the little badge on the bell in the nav
- */
-function updateNotificationBadge() {
+async function updateNotificationBadge() {
   const badge = document.getElementById("notificationBadge");
-  const currentUser = getCurrentUser();
-
+  const current = getCurrentUser();
   if (!badge) return;
 
-  if (!currentUser) {
-    badge.textContent = "";
+  if (!current) {
     badge.style.display = "none";
     return;
   }
 
-  const list = getNotificationsForUser(currentUser.id);
-  const count = list.length;
+  const notifications = await getNotificationsForUser(current.id);
+  const count = notifications.length;
 
   if (count > 0) {
     badge.textContent = String(count);
     badge.style.display = "inline-block";
   } else {
-    badge.textContent = "";
     badge.style.display = "none";
   }
 }
 
-/**
- * Render the notification panel when you click the bell
- */
-function renderNotificationsPanel() {
-  const currentUser = getCurrentUser();
+async function renderNotificationsPanel() {
+  const current = getCurrentUser();
   const panel = document.getElementById("notificationPanel");
   const listEl = document.getElementById("notificationList");
   const emptyEl = document.getElementById("notificationEmpty");
 
   if (!panel || !listEl || !emptyEl) return;
 
-  if (!currentUser) {
+  if (!current) {
     listEl.innerHTML = "";
     emptyEl.textContent = "Log in to see notifications.";
     panel.removeAttribute("hidden");
     return;
   }
 
-  const notifications = getNotificationsForUser(currentUser.id);
+  const notifications = await getNotificationsForUser(current.id);
 
   if (!notifications.length) {
     listEl.innerHTML = "";
@@ -192,67 +166,48 @@ function renderNotificationsPanel() {
   emptyEl.textContent = "";
   listEl.innerHTML = "";
 
-  notifications
-    .slice()
-    .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
-    .forEach((n) => {
-      const when = timeAgo(n.timestamp || Date.now());
-      const li = document.createElement("li");
-      li.className = "list-group-item small";
+  notifications.forEach((n) => {
+    const when = timeAgo(n.timestamp || Date.now());
+    const li = document.createElement("li");
+    li.className = "list-group-item small";
 
-      const text =
-        n.type === "comment"
-          ? `${n.commenterName} commented on your post: “${n.text.slice(
-              0,
-              80
-            )}${n.text.length > 80 ? "…" : ""}”`
-          : n.text || "New activity on your post";
+    const text = `${n.commenterName} commented: “${n.text}”`;
 
-      li.innerHTML = `
-        <div class="d-flex flex-column">
-          <span>${escapeHtml(text)}</span>
-          <span class="text-body-secondary">${escapeHtml(when)}</span>
-        </div>
-      `;
+    li.innerHTML = `
+      <div class="d-flex flex-column">
+        <span>${escapeHtml(text)}</span>
+        <span class="text-body-secondary">${escapeHtml(when)}</span>
+      </div>
+    `;
 
-      listEl.appendChild(li);
-    });
+    listEl.appendChild(li);
+  });
 
   panel.removeAttribute("hidden");
 }
 
-// Hook up the bell
-// Hook up the bell (direct listener, easier to debug)
+// ===========================
+//  BELL CLICK HANDLER
+// ===========================
 window.addEventListener("DOMContentLoaded", () => {
   const bell = document.getElementById("notificationBell");
-  if (!bell) {
-    console.warn("notificationBell element not found in DOM");
-    return;
-  }
+  const panel = document.getElementById("notificationPanel");
 
-  bell.addEventListener("click", (e) => {
-    e.preventDefault(); // prevent link navigation if it's an <a>
-    console.log("Notification bell clicked");
+  if (!bell) return;
 
-    const panel = document.getElementById("notificationPanel");
-    if (!panel) {
-      console.warn("notificationPanel element not found");
-      return;
-    }
+  bell.addEventListener("click", async () => {
+    const isHidden =
+      panel.hasAttribute("hidden") || panel.style.display === "none";
 
-    const isHidden = panel.hasAttribute("hidden");
     if (isHidden) {
-      // show + render
-      renderNotificationsPanel();
+      await renderNotificationsPanel();
 
-      // clear them (optional: only after viewing)
-      const currentUser = getCurrentUser();
-      if (currentUser) {
-        clearNotificationsForUser(currentUser.id);
-        updateNotificationBadge();
+      const current = getCurrentUser();
+      if (current) {
+        await clearNotificationsForUser(current.id);
+        await updateNotificationBadge();
       }
     } else {
-      // hide
       panel.setAttribute("hidden", "true");
     }
   });
@@ -2304,7 +2259,6 @@ document.addEventListener("submit", async function (e) {
       timestamp: Date.now(),
     });
 
-    console.log("Notifications map now:", loadNotificationsMap());
     updateNotificationBadge();
   }
 
