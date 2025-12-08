@@ -661,12 +661,12 @@ body {
 .fb-profile-name {
   font-size: 1.35rem;
   font-weight: 700;
-  text-shadow: 0 1px 3px white, 0 0 5px white;
+  text-shadow: 0 1px 3px white;
 }
 
 .fb-profile-username {
   font-size: 0.9rem;
-  text-shadow: 0 1px 2px white, 0 0 2px white;
+  text-shadow: 0 1px 2px white;
 }
 
 .fb-profile-stats {
