@@ -215,6 +215,77 @@ function escapeHtml(str) {
     .replace(/'/g, "&#039;");
 }
 
+// Same helpers as index.js
+function extractYouTubeId(url) {
+  try {
+    const u = new URL(url);
+    const host = u.hostname.replace(/^www\./, "");
+
+    if (host === "youtu.be") {
+      return u.pathname.slice(1).split("/")[0] || null;
+    }
+    if (host.endsWith("youtube.com")) {
+      if (u.pathname === "/watch") {
+        return u.searchParams.get("v");
+      }
+      if (u.pathname.startsWith("/shorts/")) {
+        return u.pathname.split("/")[2] || null;
+      }
+      if (u.pathname.startsWith("/embed/")) {
+        return u.pathname.split("/")[2] || null;
+      }
+    }
+  } catch (e) {}
+  return null;
+}
+
+function parsePostBodyWithLinks(rawText) {
+  if (!rawText) {
+    return { bodyHtml: "", embedHtml: "" };
+  }
+
+  let escaped = escapeHtml(rawText);
+  const urlRegex = /(https?:\/\/[^\s<]+)/gi;
+  let firstYouTubeId = null;
+
+  const linked = escaped.replace(urlRegex, (match) => {
+    const url = match;
+    const unescapedUrl = match
+      .replace(/&amp;/g, "&")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&quot;/g, '"')
+      .replace(/&#039;/g, "'");
+
+    const ytId = extractYouTubeId(unescapedUrl);
+    if (!firstYouTubeId && ytId) {
+      firstYouTubeId = ytId;
+    }
+    return `<a href="${url}" class="post-link" target="_blank" rel="noopener noreferrer">${url}</a>`;
+  });
+
+  const bodyHtml = linked.replace(/\n/g, "<br>");
+
+  let embedHtml = "";
+  if (firstYouTubeId) {
+    embedHtml = `
+      <div class="post-embed mt-2">
+        <div class="ratio ratio-16x9">
+          <iframe
+            src="https://www.youtube.com/embed/${firstYouTubeId}"
+            title="YouTube video"
+            frameborder="0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowfullscreen
+          ></iframe>
+        </div>
+      </div>
+    `;
+  }
+
+  return { bodyHtml, embedHtml };
+}
+
 function timeAgo(timestamp) {
   const now = Date.now();
   const diffMs = now - timestamp;
@@ -1179,7 +1250,7 @@ posts = posts.sort((a, b) => b.createdAt - a.createdAt);
     const userLiked =
       currentUser && hasUserLikedPost(currentUser.id, post.id);
     const canDelete = currentUser && currentUser.id === post.userId;
-    const bodyHtml = escapeHtml(post.body || "").replace(/\n/g, "<br>");
+    const { bodyHtml, embedHtml } = parsePostBodyWithLinks(post.body || "");
 
     const postImageHtml = post.imageDataUrl
   ? `
@@ -1229,8 +1300,9 @@ posts = posts.sort((a, b) => b.createdAt - a.createdAt);
 
             <div class="post-body">
               ${bodyHtml}
-              ${postImageHtml}
             </div>
+            ${embedHtml}
+            ${postImageHtml}
 
             <div class="post-actions mt-1">
               <button

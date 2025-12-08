@@ -507,6 +507,9 @@ function toggleFollowLocal(followerId, targetId) {
 // ===========================
 //  UTILS
 // ===========================
+// ===========================
+//  UTILS
+// ===========================
 function escapeHtml(str) {
   return String(str)
     .replace(/&/g, "&amp;")
@@ -514,6 +517,95 @@ function escapeHtml(str) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
+}
+
+// NEW: detect YouTube video id from a URL
+function extractYouTubeId(url) {
+  try {
+    const u = new URL(url);
+
+    const host = u.hostname.replace(/^www\./, "");
+
+    // Short links: https://youtu.be/VIDEOID
+    if (host === "youtu.be") {
+      return u.pathname.slice(1).split("/")[0] || null;
+    }
+
+    // Normal YouTube domains
+    if (host.endsWith("youtube.com")) {
+      // watch?v=VIDEOID
+      if (u.pathname === "/watch") {
+        return u.searchParams.get("v");
+      }
+
+      // /shorts/VIDEOID
+      if (u.pathname.startsWith("/shorts/")) {
+        return u.pathname.split("/")[2] || null;
+      }
+
+      // /embed/VIDEOID
+      if (u.pathname.startsWith("/embed/")) {
+        return u.pathname.split("/")[2] || null;
+      }
+    }
+  } catch (e) {
+    // ignore bad URLs
+  }
+  return null;
+}
+
+// NEW: convert text -> HTML + optional YouTube embed
+function parsePostBodyWithLinks(rawText) {
+  if (!rawText) {
+    return { bodyHtml: "", embedHtml: "" };
+  }
+
+  // Escape first so we don’t inject HTML
+  let escaped = escapeHtml(rawText);
+
+  // Find URLs
+  const urlRegex = /(https?:\/\/[^\s<]+)/gi;
+  let firstYouTubeId = null;
+
+  const linked = escaped.replace(urlRegex, (match) => {
+    const url = match; // already escaped above
+
+    // We need the *unescaped* URL string to inspect it
+    const unescapedUrl = match
+      .replace(/&amp;/g, "&")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&quot;/g, '"')
+      .replace(/&#039;/g, "'");
+
+    const ytId = extractYouTubeId(unescapedUrl);
+    if (!firstYouTubeId && ytId) {
+      firstYouTubeId = ytId;
+    }
+
+    return `<a href="${url}" class="post-link" target="_blank" rel="noopener noreferrer">${url}</a>`;
+  });
+
+  const bodyHtml = linked.replace(/\n/g, "<br>");
+
+  let embedHtml = "";
+  if (firstYouTubeId) {
+    embedHtml = `
+      <div class="post-embed mt-2">
+        <div class="ratio ratio-16x9">
+          <iframe
+            src="https://www.youtube.com/embed/${firstYouTubeId}"
+            title="YouTube video"
+            frameborder="0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowfullscreen
+          ></iframe>
+        </div>
+      </div>
+    `;
+  }
+
+  return { bodyHtml, embedHtml };
 }
 
 function timeAgo(timestamp) {
@@ -931,19 +1023,19 @@ function renderPosts() {
 
     const canDelete = currentUser && currentUser.id === post.userId;
 
-    const bodyHtml = escapeHtml(post.body || "").replace(/\n/g, "<br>");
+    const { bodyHtml, embedHtml } = parsePostBodyWithLinks(post.body || "");
 
-    const postImageHtml = post.imageDataUrl
-      ? `
-        <div class="post-image mt-2">
-          <img
-            src="${escapeHtml(post.imageDataUrl)}"
-            alt="Post image"
-            class="post-image-img"
-          />
-        </div>
-      `
-      : "";
+const postImageHtml = post.imageDataUrl
+  ? `
+    <div class="post-image mt-2">
+      <img
+        src="${escapeHtml(post.imageDataUrl)}"
+        alt="Post image"
+        class="post-image-img"
+      />
+    </div>
+  `
+  : "";
 
     const article = document.createElement("article");
     article.className = "post-card mb-2";
@@ -984,9 +1076,10 @@ function renderPosts() {
           </div>
 
           <div class="post-body">
-            ${bodyHtml}
-            ${postImageHtml}
-          </div>
+          ${bodyHtml}
+        </div>
+        ${embedHtml}
+        ${postImageHtml}
 
           <div class="post-actions mt-1">
             <button

@@ -339,6 +339,18 @@ body {
   line-height: 1.5;
 }
 
+.post-body a.post-link {
+  word-break: break-word;
+  text-decoration: underline;
+}
+
+.post-embed {
+  margin-top: 0.35rem;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  background-color: var(--card-bg-soft, #020617);
+}
+
 /* Post actions */
 
 .post-actions {
