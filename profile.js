@@ -1854,7 +1854,8 @@ document.addEventListener("submit", async function (e) {
   const form = e.target.closest(".comment-form");
   if (!form) return;
 
-  // ✅ Only handle comment forms inside the profile posts card
+  // Only handle comment forms on the profile page
+  // (the file is only loaded on profile.html, so this is technically optional)
   if (!form.closest("#profilePosts")) return;
 
   e.preventDefault();
@@ -1868,7 +1869,9 @@ document.addEventListener("submit", async function (e) {
   const article = form.closest(".post-card");
   if (!article || !article.dataset.postId) return;
 
-  const postId = Number(article.dataset.postId);
+  // 🔑 Keep postId as a string and compare with String(...) everywhere
+  const postId = article.dataset.postId;
+
   const input = form.querySelector(".comment-input");
   const fileInput = form.querySelector(".comment-image-input");
   if (!input) return;
@@ -1885,7 +1888,6 @@ document.addEventListener("submit", async function (e) {
       imageDataUrl = await resizeImageTo300px(file);
     } catch (err) {
       console.error("Error reading comment image on this device:", err);
-      // If the user put text, we still post the text-only comment.
       if (!text) {
         alert(
           "Your image couldn't be processed on this device. Try a smaller image or add some text."
@@ -1904,7 +1906,7 @@ document.addEventListener("submit", async function (e) {
 
   const comment = {
     id: commentId,
-    postId,
+    postId: postId,                        // keep as string for consistency
     userId: user.id,
     username: user.username,
     name: user.name,
@@ -1913,26 +1915,26 @@ document.addEventListener("submit", async function (e) {
     createdAt: now,
   };
 
-  // 🔔 Create a notification for the post owner (if it's not you)
+  // --- NOTIFICATION LOGIC (fixed) ---
   const posts = loadPosts();
-  const post = posts.find((p) => p.id === postId);
+  const post = posts.find((p) => String(p.id) === String(postId));
 
-  if (post && String(user.id) !== String(post.userId)) {
+  // Only notify if someone ELSE owns the post
+  if (post && post) {
     try {
       await addNotification(post.userId, {
-        type: "comment",           // 👈 match index.js
-        postId,
+        type: "comment",
+        postId: post.id,
         commenterId: user.id,
         commenterName: user.name,
-        text,                      // use original text string
-        timestamp: now,
+        text,
       });
+
+      // Update badge instantly (cross-device)
+      await updateNotificationBadge();
     } catch (err) {
       console.error("Error adding notification:", err);
     }
-
-    // Badge updates for whoever is currently logged in on this device
-    updateNotificationBadge();
   }
 
   // ✅ Local storage
@@ -2436,11 +2438,16 @@ document.addEventListener("click", function (e) {
 // ===========================
 
 // Add a new notification for a user
+// Add a new notification for a user
 async function addNotification(userId, notif) {
   if (!userId || !notif) return;
 
   const payload = {
     userId: String(userId),
+
+    // 👇 Make sure "type" is stored, just like on index.js
+    type: notif.type || "comment",
+
     postId: notif.postId ?? null,
     commenterId: notif.commenterId ?? null,
     commenterName: notif.commenterName ?? "",
@@ -2457,6 +2464,7 @@ async function addNotification(userId, notif) {
 }
 
 // Fetch all notifications for this user (we'll filter unread client-side)
+// Fetch all notifications for this user (we'll filter unread client-side)
 async function getNotificationsForUser(userId) {
   if (!userId) return [];
 
@@ -2467,6 +2475,8 @@ async function getNotificationsForUser(userId) {
       orderBy("timestamp", "desc")
     );
     const snap = await getDocs(q);
+
+    // ✅ FIXED: spread d.data() instead of ".d.data()"
     return snap.docs.map((d) => ({
       id: d.id,
       ...d.data(),
