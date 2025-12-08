@@ -22,6 +22,8 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut,
+  GoogleAuthProvider,
+  signInWithPopup,
 } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
 
 // 🔹 Your Firebase web config
@@ -37,6 +39,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
+const googleProvider = new GoogleAuthProvider();
 
 // Collections
 const usersCol = collection(db, "users");
@@ -1729,14 +1732,15 @@ onAuthStateChanged(auth, async (fbUser) => {
     // Signed out
     clearCurrentUser();
     updateAuthUI();
-    updateNotificationBadge(); // clear badge on logout too, if you like
+    updateNotificationBadge();
     return;
   }
 
   const uid = fbUser.uid;
 
   try {
-    const userDoc = await getDoc(doc(usersCol, uid));
+    const userRef = doc(usersCol, uid);
+    const userDoc = await getDoc(userRef);
 
     let user;
     if (userDoc.exists()) {
@@ -1745,8 +1749,18 @@ onAuthStateChanged(auth, async (fbUser) => {
         id: uid,
         ...data,
       };
+
+      // If we don't have an avatar stored yet but Google provides one, save it
+      if (!data.avatar && fbUser.photoURL) {
+        try {
+          await updateDoc(userRef, { avatar: fbUser.photoURL });
+          user.avatar = fbUser.photoURL;
+        } catch (e) {
+          console.warn("Could not update avatar from Google:", e);
+        }
+      }
     } else {
-      // Fallback: create a basic profile if somehow missing
+      // Fallback: create a basic profile if missing (works for Google or email users)
       user = {
         id: uid,
         name: fbUser.displayName || "New User",
@@ -1754,15 +1768,16 @@ onAuthStateChanged(auth, async (fbUser) => {
           (fbUser.email && fbUser.email.split("@")[0]) ||
           `user-${uid.slice(0, 6)}`,
         email: fbUser.email || "",
+        avatar: fbUser.photoURL || "",
         createdAt: Date.now(),
       };
 
-      await setDoc(doc(usersCol, uid), user);
+      await setDoc(userRef, user);
     }
 
     setCurrentUser(user);
     updateAuthUI();
-    updateNotificationBadge(); // ✅ refresh badge after login
+    updateNotificationBadge();
   } catch (err) {
     console.error("Error in onAuthStateChanged profile sync:", err);
   }
@@ -2007,6 +2022,33 @@ if (signupForm) {
     }
   });
 }
+
+// ===========================
+//  GOOGLE LOGIN HANDLER
+// ===========================
+async function loginWithGoogle() {
+  try {
+    // Open Google popup
+    await signInWithPopup(auth, googleProvider);
+
+    // onAuthStateChanged will create / load the profile for us
+
+    // Close login modal if it’s open
+    const loginModalEl = document.getElementById("loginModal");
+    if (loginModalEl && typeof bootstrap !== "undefined") {
+      const modalInstance =
+        bootstrap.Modal.getInstance(loginModalEl) ||
+        new bootstrap.Modal(loginModalEl);
+      modalInstance.hide();
+    }
+  } catch (err) {
+    console.error("Google login error:", err);
+    alert(err.message || "Google sign-in failed. Please try again.");
+  }
+}
+
+// Make available to inline HTML onclick
+window.loginWithGoogle = loginWithGoogle;
 
 // ===========================
 //  LOGIN HANDLER (Firebase Auth)
