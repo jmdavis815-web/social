@@ -661,6 +661,7 @@ body {
 .fb-profile-name {
   font-size: 1.35rem;
   font-weight: 700;
+  text-shadow: 0 1px 3px white, 0 0 5px white;
 }
 
 .fb-profile-username {
@@ -718,7 +719,9 @@ body {
 
   .fb-profile-avatar {
     width: 96px;
+    min-width: 96px;
     height: 96px;
+    max-height: 96px;
   }
 
   .fb-profile-tabs {
