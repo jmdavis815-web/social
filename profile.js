@@ -8,6 +8,7 @@ import {
   doc,
   getDocs,
   setDoc,
+  addDoc,
   updateDoc,
   deleteDoc,
   query,
@@ -33,6 +34,7 @@ const usersCol = collection(db, "users");
 const postsCol = collection(db, "posts");
 const commentsCol = collection(db, "comments");
 const followsCol = collection(db, "follows");
+const notificationsCol = collection(db, "notifications");
 
 // ===========================
 //  YEAR IN FOOTER
@@ -2410,46 +2412,69 @@ document.addEventListener("click", function (e) {
   }
 });
 
-const NOTIFICATIONS_KEY = "openwall-notifications";
+// ===========================
+//  NOTIFICATIONS (Firestore, cross-device)
+// ===========================
 
-// Load notification map
-function loadNotifications() {
+// Add a new notification for a user
+async function addNotification(userId, notif) {
+  if (!userId || !notif) return;
+
+  const payload = {
+    userId: String(userId),
+    postId: notif.postId ?? null,
+    commenterId: notif.commenterId ?? null,
+    commenterName: notif.commenterName ?? "",
+    text: notif.text ?? "",
+    timestamp: notif.timestamp ?? Date.now(),
+    read: false,
+  };
+
   try {
-    return JSON.parse(localStorage.getItem(NOTIFICATIONS_KEY)) || {};
-  } catch {
-    return {};
+    await addDoc(notificationsCol, payload);
+  } catch (err) {
+    console.error("Error adding notification to Firestore:", err);
   }
 }
 
-// Save notification map
-function saveNotifications(map) {
-  localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(map));
+// Fetch all notifications for this user (we'll filter unread client-side)
+async function getNotificationsForUser(userId) {
+  if (!userId) return [];
+
+  try {
+    const q = query(
+      notificationsCol,
+      where("userId", "==", String(userId)),
+      orderBy("timestamp", "desc")
+    );
+    const snap = await getDocs(q);
+    return snap.docs.map((d) => ({
+      id: d.id,
+      ...d.data(),
+    }));
+  } catch (err) {
+    console.error("Error loading notifications from Firestore:", err);
+    return [];
+  }
 }
 
-// Add a new notification
-function addNotification(userId, notif) {
-  const map = loadNotifications();
-  const list = Array.isArray(map[userId]) ? map[userId] : [];
-  list.push(notif);
-  map[userId] = list;
-  saveNotifications(map);
+// Mark a list of notifications as read
+async function markNotificationsRead(notifications) {
+  const updates = notifications
+    .filter((n) => !n.read)
+    .map((n) =>
+      updateDoc(doc(notificationsCol, n.id), { read: true }).catch((err) =>
+        console.error("Error marking notification read:", err)
+      )
+    );
+
+  if (updates.length) {
+    await Promise.allSettled(updates);
+  }
 }
 
-// Mark all as read
-function clearNotifications(userId) {
-  const map = loadNotifications();
-  map[userId] = [];
-  saveNotifications(map);
-}
-
-// Count unread
-function getNotificationCount(userId) {
-  const map = loadNotifications();
-  const list = map[userId] || [];
-  return list.length;
-}
-
-function updateNotificationBadge() {
+// Update the badge in the navbar
+async function updateNotificationBadge() {
   const badge = document.getElementById("notificationBadge");
   const current = getCurrentUser();
   if (!badge) return;
@@ -2461,9 +2486,11 @@ function updateNotificationBadge() {
     return;
   }
 
-  const count = getNotificationCount(current.id);
-  if (count > 0) {
-    badge.textContent = String(count);
+  const list = await getNotificationsForUser(current.id);
+  const unreadCount = list.filter((n) => !n.read).length;
+
+  if (unreadCount > 0) {
+    badge.textContent = String(unreadCount);
     badge.style.display = "inline-block";
   } else {
     badge.textContent = "";
@@ -2471,6 +2498,7 @@ function updateNotificationBadge() {
   }
 }
 
+// Kick off badge update (no need to await)
 updateNotificationBadge();
 
 // ===========================
@@ -2503,21 +2531,20 @@ const notifList = document.getElementById("notificationList");
 const notifEmpty = document.getElementById("notificationEmpty");
 
 if (notifBtn && notifPanel && notifList) {
-  notifBtn.addEventListener("click", (e) => {
+  notifBtn.addEventListener("click", async (e) => {
     e.preventDefault();
 
     const current = getCurrentUser();
     if (!current) {
-      // Optionally show a toast instead of alert
       alert("Log in to see notifications.");
       return;
     }
 
-    const map = loadNotifications();
-    const unread = Array.isArray(map[current.id]) ? map[current.id] : [];
+    // Load from Firestore
+    const allNotifs = await getNotificationsForUser(current.id);
+    const unread = allNotifs.filter((n) => !n.read);
 
-    if (!unread.length) {
-      // No notifications
+    if (!allNotifs.length) {
       if (notifEmpty) {
         notifEmpty.textContent = "No notifications yet.";
         notifEmpty.style.display = "block";
@@ -2528,24 +2555,35 @@ if (notifBtn && notifPanel && notifList) {
         notifEmpty.style.display = "none";
       }
 
-      notifList.innerHTML = unread
-        .map(
-          (n) => `
-          <li class="list-group-item small">
-            <strong>${escapeHtml(n.commenterName || "Someone")}</strong>
-            commented on your post:<br>
-            <span class="text-body-secondary">"${escapeHtml(n.text || "")}"</span>
-          </li>
-        `
-        )
+      notifList.innerHTML = allNotifs
+        .map((n) => {
+          const when = timeAgo(n.timestamp || Date.now());
+          const commentText = n.text || "";
+          const who = n.commenterName || "Someone";
+
+          return `
+            <li class="list-group-item small">
+              <div class="d-flex justify-content-between">
+                <div>
+                  <strong>${escapeHtml(who)}</strong>
+                  commented on your post:<br>
+                  <span class="text-body-secondary">
+                    "${escapeHtml(commentText)}"
+                  </span>
+                </div>
+                <span class="text-body-secondary ms-2">${escapeHtml(when)}</span>
+              </div>
+            </li>
+          `;
+        })
         .join("");
     }
 
-    // Mark all as read + update badge
-    clearNotifications(current.id);
+    // Mark all as read in Firestore + update badge
+    await markNotificationsRead(allNotifs);
     updateNotificationBadge();
 
-    // Toggle hidden attribute
+    // Toggle panel visibility
     const isHidden =
       notifPanel.hasAttribute("hidden") || notifPanel.style.display === "none";
 
@@ -2575,6 +2613,7 @@ if (notifBtn && notifPanel && notifList) {
     });
   }
 }
+
 
 
 
